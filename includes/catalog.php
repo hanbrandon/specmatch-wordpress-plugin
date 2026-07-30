@@ -29,6 +29,14 @@ function pc_public_image_url(?object $device): ?string
     return home_url('/phone-media/' . (int) $device->source_id . '/');
 }
 
+function pc_public_tech_image_url(int $post_id): ?string
+{
+    if (!get_post_meta($post_id, '_tech_image_url', true)) {
+        return null;
+    }
+    return home_url('/catalog-media/' . $post_id . '/');
+}
+
 function pc_register_media_routes(): void
 {
     add_rewrite_rule(
@@ -36,65 +44,55 @@ function pc_register_media_routes(): void
         'index.php?pc_phone_media=$matches[1]',
         'top'
     );
+    add_rewrite_rule(
+        '^catalog-media/([0-9]+)/?$',
+        'index.php?pc_catalog_media=$matches[1]',
+        'top'
+    );
 }
 
 function pc_media_query_vars(array $vars): array
 {
     $vars[] = 'pc_phone_media';
+    $vars[] = 'pc_catalog_media';
     return $vars;
 }
 
-function pc_serve_phone_media(): void
+function pc_output_cached_remote_image(string $remote_url, string $directory, string $filename): void
 {
-    $source_id = (int) get_query_var('pc_phone_media');
-    if (!$source_id) {
-        return;
-    }
-
-    global $wpdb;
-    $table = pc_table('devices');
-    $device = $wpdb->get_row(
-        $wpdb->prepare(
-            "SELECT source_id, image_url FROM {$table} WHERE source_id = %d",
-            $source_id
-        )
-    );
-    if (!$device || !$device->image_url) {
-        status_header(404);
-        exit;
-    }
-
-    $uploads = wp_upload_dir();
-    $directory = trailingslashit($uploads['basedir']) . 'phone-catalog';
-    $filename = $source_id . '.jpg';
     $path = trailingslashit($directory) . $filename;
-
     if (!is_file($path)) {
         wp_mkdir_p($directory);
-        $response = wp_safe_remote_get($device->image_url, [
-            'timeout' => 20,
+        $response = wp_safe_remote_get($remote_url, [
+            'timeout' => 30,
             'redirection' => 3,
-            'headers' => ['User-Agent' => 'PhoneCatalog/1.0'],
+            'headers' => ['User-Agent' => 'SpecMatch/1.0'],
         ]);
         if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
             status_header(404);
             exit;
         }
-        $content_type = (string) wp_remote_retrieve_header($response, 'content-type');
-        if (!str_starts_with(strtolower($content_type), 'image/')) {
+        $content_type = strtolower((string) wp_remote_retrieve_header($response, 'content-type'));
+        $body = wp_remote_retrieve_body($response);
+        if (!str_starts_with($content_type, 'image/') || $body === '') {
             status_header(415);
             exit;
         }
-        file_put_contents($path, wp_remote_retrieve_body($response), LOCK_EX);
-    }
-
-    $htaccess = trailingslashit($directory) . '.htaccess';
-    if (!is_file($htaccess)) {
-        file_put_contents(
-            $htaccess,
-            "Options -Indexes\n<IfModule mod_headers.c>\nHeader set X-Robots-Tag \"noindex\"\n</IfModule>\n",
-            LOCK_EX
-        );
+        $temporary_path = $path . '.' . wp_generate_password(8, false) . '.tmp';
+        if (file_put_contents($temporary_path, $body, LOCK_EX) === false) {
+            status_header(500);
+            exit;
+        }
+        if (!@getimagesize($temporary_path)) {
+            unlink($temporary_path);
+            status_header(415);
+            exit;
+        }
+        if (!@rename($temporary_path, $path)) {
+            unlink($temporary_path);
+            status_header(500);
+            exit;
+        }
     }
 
     $image_info = @getimagesize($path);
@@ -117,6 +115,47 @@ function pc_serve_phone_media(): void
     header('Cache-Control: public, max-age=604800, immutable');
     readfile($path);
     exit;
+}
+
+function pc_serve_phone_media(): void
+{
+    $source_id = (int) get_query_var('pc_phone_media');
+    $uploads = wp_upload_dir();
+    if ($source_id) {
+        global $wpdb;
+        $table = pc_table('devices');
+        $device = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT source_id, image_url FROM {$table} WHERE source_id = %d",
+                $source_id
+            )
+        );
+        if (!$device || !$device->image_url) {
+            status_header(404);
+            exit;
+        }
+        pc_output_cached_remote_image(
+            (string) $device->image_url,
+            trailingslashit($uploads['basedir']) . 'phone-catalog',
+            $source_id . '.jpg'
+        );
+    }
+
+    $post_id = (int) get_query_var('pc_catalog_media');
+    if (!$post_id) {
+        return;
+    }
+    $post_type = get_post_type($post_id);
+    $remote_url = (string) get_post_meta($post_id, '_tech_image_url', true);
+    if (!in_array($post_type, ['laptop', 'cpu', 'gpu'], true) || !$remote_url) {
+        status_header(404);
+        exit;
+    }
+    pc_output_cached_remote_image(
+        $remote_url,
+        trailingslashit($uploads['basedir']) . 'phone-catalog/hardware',
+        $post_id . '.image'
+    );
 }
 
 function pc_newest_query_args(): array

@@ -42,7 +42,7 @@ function pc_register_rest_routes(): void
                     'name' => $post->post_title,
                     'slug' => $post->post_name,
                     'brand' => $post_type === 'phone' ? $device?->brand : (!is_wp_error($brands) ? ($brands[0] ?? '') : ''),
-                    'image' => $post_type === 'phone' ? pc_public_image_url($device) : get_post_meta($post->ID, '_tech_image_url', true),
+                    'image' => $post_type === 'phone' ? pc_public_image_url($device) : pc_public_tech_image_url((int) $post->ID),
                     'url' => get_permalink($post),
                 ];
             }, $query->posts);

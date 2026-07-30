@@ -94,7 +94,7 @@ function pc_contextual_seo_data(): array
         $title = $data['name'] . ' 스펙·벤치마크 | ' . $site_name;
         $description = wp_html_excerpt($data['description'], 155, '…');
         $canonical = get_permalink($post_id);
-        $image = (string) get_post_meta($post_id, '_tech_image_url', true);
+        $image = (string) pc_public_tech_image_url($post_id);
         $type = 'product';
     } elseif (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu']) || is_tax('phone_brand')) {
         $archive_type = is_tax('phone_brand') ? 'phone' : (string) get_query_var('post_type');

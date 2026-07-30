@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SpecMatch Catalog
  * Description: 휴대폰 스펙, 비교, 제휴 상품과 프로그램매틱 SEO 페이지를 관리합니다.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * Author: SpecMatch
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PC_VERSION', '0.1.0');
+define('PC_VERSION', '0.1.1');
 define('PC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PC_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -36,8 +36,11 @@ function pc_activate(): void
     pc_install_schema();
     pc_register_content_types();
     pc_register_compare_routes();
+    pc_register_series_routes();
+    pc_register_media_routes();
     pc_ensure_pages();
     flush_rewrite_rules();
+    update_option('pc_rewrite_version', PC_VERSION, false);
 }
 
 add_action('init', 'pc_register_content_types');
@@ -46,6 +49,7 @@ add_action('init', 'pc_schedule_metrics_cleanup');
 add_action('pc_cleanup_old_metrics', 'pc_cleanup_old_metrics');
 add_action('init', 'pc_register_compare_routes');
 add_action('init', 'pc_register_media_routes');
+add_action('init', 'pc_maybe_refresh_rewrite_rules', 99);
 add_action('pre_get_posts', 'pc_order_phone_archives_newest_first');
 add_action('template_redirect', 'pc_serve_phone_media');
 add_action('rest_api_init', 'pc_register_rest_routes');
@@ -61,6 +65,15 @@ add_filter('document_title_parts', 'pc_document_title_parts');
 add_action('wp_head', 'pc_output_seo', 20);
 add_action('template_redirect', 'pc_redirect_legacy_hardware_brand_url', 5);
 add_action('template_redirect', 'pc_catalog_empty_filter_status', 20);
+
+function pc_maybe_refresh_rewrite_rules(): void
+{
+    if (get_option('pc_rewrite_version') === PC_VERSION) {
+        return;
+    }
+    flush_rewrite_rules(false);
+    update_option('pc_rewrite_version', PC_VERSION, false);
+}
 
 if (defined('WP_CLI') && WP_CLI) {
     require_once PC_PLUGIN_DIR . 'includes/cli.php';
