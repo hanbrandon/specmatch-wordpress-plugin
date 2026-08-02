@@ -4,39 +4,48 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-function pc_selected_comparisons(int $limit = 50): array
+function pc_selected_comparisons(int $limit = 100): array
 {
     $posts = (new WP_Query(array_merge([
         'post_type' => 'phone',
         'post_status' => 'publish',
-        'posts_per_page' => 24,
+        'posts_per_page' => 50,
         'no_found_rows' => true,
     ], pc_newest_query_args())))->posts;
     $devices = array_values(array_filter(array_map(
         static fn(WP_Post $post): ?object => pc_get_device((int) $post->ID),
         $posts
     )));
-    $comparisons = [];
+    $candidates = [];
 
     for ($i = 0, $total = count($devices); $i < $total; $i++) {
-        for ($j = $i + 1; $j < min($total, $i + 4); $j++) {
+        for ($j = $i + 1; $j < $total; $j++) {
             $a = $devices[$i];
             $b = $devices[$j];
-            if (!pc_compare_is_indexable($a, $b)) {
-                continue;
-            }
-            $comparisons[] = [
+            $candidates[] = [
                 'a' => $a,
                 'b' => $b,
                 'url' => pc_compare_url($a, $b),
                 'lastmod' => max((string) $a->updated_at, (string) $b->updated_at),
+                'score' => pc_phone_comparison_score($a, $b),
             ];
-            if (count($comparisons) >= $limit) {
-                return $comparisons;
-            }
         }
     }
-    return $comparisons;
+    usort($candidates, static fn(array $a, array $b): int => $b['score'] <=> $a['score']);
+    $ranked = [];
+    foreach ($candidates as $candidate) {
+        if (!pc_compare_is_indexable($candidate['a'], $candidate['b'])) {
+            continue;
+        }
+        $ranked[] = $candidate;
+        if (count($ranked) >= $limit) {
+            break;
+        }
+    }
+    return array_map(static function (array $item): array {
+        unset($item['score']);
+        return $item;
+    }, $ranked);
 }
 
 function pc_selected_tech_comparisons(int $limit_per_type = 25): array

@@ -82,8 +82,9 @@ function pc_contextual_seo_data(): array
     } elseif (is_singular('phone')) {
         $device = pc_get_device((int) get_queried_object_id());
         if ($device) {
-            $title = $device->model . ' 스펙·평가·비교 | ' . $site_name;
-            $description = wp_html_excerpt(pc_device_insights($device)['summary'], 155, '…');
+            $name = pc_product_name((int) $device->post_id);
+            $title = $name . ' 스펙·평가·비교 | ' . $site_name;
+            $description = $name . '의 출시일, 화면, 카메라, 배터리, 성능과 전체 스펙을 확인하고 비슷한 최신 제품과 비교하세요.';
             $canonical = get_permalink((int) $device->post_id);
             $image = (string) pc_public_image_url($device);
             $type = 'product';
@@ -117,8 +118,10 @@ function pc_contextual_seo_data(): array
         } else {
             [$a, $b] = pc_compare_devices();
             if ($a && $b) {
-                $title = $a->model . ' vs ' . $b->model . ' 비교 | ' . $site_name;
-                $description = wp_html_excerpt(pc_compare_insights($a, $b)['verdict'], 155, '…');
+                $name_a = pc_product_name((int) $a->post_id);
+                $name_b = pc_product_name((int) $b->post_id);
+                $title = $name_a . ' vs ' . $name_b . ' 차이 비교 | ' . $site_name;
+                $description = $name_a . '과 ' . $name_b . '의 성능, 화면, 카메라, 배터리와 주요 스펙 차이를 항목별로 비교하세요.';
                 $canonical = pc_compare_url($a, $b);
             }
         }
@@ -231,7 +234,11 @@ function pc_output_seo(): void
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'Product',
-            'name' => $device->model,
+            'name' => pc_product_name((int) $device->post_id),
+            'alternateName' => array_values(array_filter([
+                pc_product_original_name((int) $device->post_id),
+                $device->model,
+            ])),
             'brand' => ['@type' => 'Brand', 'name' => $device->brand],
             'model' => $device->model,
             'category' => '스마트폰',
@@ -332,7 +339,7 @@ function pc_breadcrumb_items(): array
             if ($term && !is_wp_error($term)) {
                 $items[] = ['name' => $device->brand, 'url' => get_term_link($term)];
             }
-            $items[] = ['name' => $device->model, 'url' => ''];
+            $items[] = ['name' => pc_product_name((int) $device->post_id), 'url' => ''];
         }
     } elseif (is_singular(['laptop', 'cpu', 'gpu'])) {
         $type = get_post_type();
@@ -351,7 +358,7 @@ function pc_breadcrumb_items(): array
         [$a, $b] = pc_compare_devices();
         $items[] = ['name' => '기기 비교', 'url' => home_url('/compare/')];
         if ($a && $b) {
-            $items[] = ['name' => $a->model . ' vs ' . $b->model, 'url' => ''];
+            $items[] = ['name' => pc_product_name((int) $a->post_id) . ' vs ' . pc_product_name((int) $b->post_id), 'url' => ''];
         }
     } elseif (is_page('compare')) {
         $items[] = ['name' => '기기 비교', 'url' => ''];
@@ -458,7 +465,7 @@ function pc_document_title_parts(array $parts): array
     } elseif (is_singular('phone')) {
         $device = pc_get_device((int) get_queried_object_id());
         if ($device) {
-            $parts['title'] = $device->model . ' 스펙·평가·비교';
+            $parts['title'] = pc_product_name((int) $device->post_id) . ' 스펙·평가·비교';
         }
     } elseif (is_singular(['laptop', 'cpu', 'gpu'])) {
         $data = pc_tech_seo_data((int) get_queried_object_id());
@@ -480,7 +487,7 @@ function pc_document_title_parts(array $parts): array
         } else {
             [$a, $b] = pc_compare_devices();
             if ($a && $b) {
-                $parts['title'] = $a->model . ' vs ' . $b->model . ' 비교';
+                $parts['title'] = pc_product_name((int) $a->post_id) . ' vs ' . pc_product_name((int) $b->post_id) . ' 차이 비교';
             }
         }
     }

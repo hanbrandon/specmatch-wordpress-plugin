@@ -17,7 +17,7 @@ get_header();
         ?>
         <header class="compare-hero">
             <p class="eyebrow">나란히 보기 / 자동 비교</p>
-            <h1><?php echo esc_html($phone_a->model); ?><span>vs</span><?php echo esc_html($phone_b->model); ?></h1>
+            <h1><?php echo esc_html(pc_product_name((int) $phone_a->post_id)); ?><span>vs</span><?php echo esc_html(pc_product_name((int) $phone_b->post_id)); ?></h1>
             <p>두 기기의 차이를 같은 기준으로 빠르게 확인하세요.</p>
         </header>
         <section class="compare-identities">
@@ -28,7 +28,8 @@ get_header();
                     <?php endif; ?>
                     <div>
                         <span><?php echo esc_html($phone->brand); ?></span>
-                        <h2><?php echo esc_html($phone->model); ?></h2>
+                        <h2><?php echo esc_html(pc_product_name((int) $phone->post_id)); ?></h2>
+                        <?php if (pc_product_original_name((int) $phone->post_id)) : ?><small class="product-original-name"><?php echo esc_html(pc_product_original_name((int) $phone->post_id)); ?></small><?php endif; ?>
                         <a href="<?php echo esc_url(get_permalink($phone->post_id)); ?>">상세 스펙 보기</a>
                     </div>
                 </article>
@@ -53,7 +54,7 @@ get_header();
                     <?php foreach ([[$phone_a, $score_a, $overall_difference], [$phone_b, $score_b, -$overall_difference]] as [$phone, $score, $lead]) : ?>
                         <article>
                             <?php if ($lead >= 2) : ?><span class="advantage-badge">종합 우세</span><?php endif; ?>
-                            <small><?php echo esc_html($phone->model); ?></small>
+                            <small><?php echo esc_html(pc_product_name((int) $phone->post_id)); ?></small>
                             <strong><?php echo $score['overall'] !== null ? esc_html($score['overall']) : '—'; ?></strong>
                             <em>/ 100</em>
                         </article>
@@ -108,7 +109,7 @@ get_header();
                 <?php foreach ([[$phone_a, $insights['a_reasons']], [$phone_b, $insights['b_reasons']]] as [$phone, $reasons]) : ?>
                     <div>
                         <span><?php echo esc_html($phone->brand); ?></span>
-                        <h3><?php echo esc_html($phone->model); ?>을 선택할 이유</h3>
+                        <h3><?php echo esc_html(pc_product_name((int) $phone->post_id)); ?>을 선택할 이유</h3>
                         <ul>
                             <?php foreach ($reasons as $reason) : ?><li><?php echo esc_html($reason); ?></li><?php endforeach; ?>
                             <?php if (!$reasons) : ?><li>아래 전체 스펙에서 필요한 기능을 직접 확인하세요.</li><?php endif; ?>

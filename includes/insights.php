@@ -99,8 +99,8 @@ function pc_device_insights(object $device): array
         $battery ? "배터리 {$battery}" : null,
     ]);
     $generated_summary = $facts
-        ? $device->model . '의 주요 사양은 ' . implode(', ', array_slice($facts, 0, 4)) . '입니다.'
-        : $device->model . '의 출시 정보와 전체 하드웨어 사양을 정리한 페이지입니다.';
+        ? pc_product_name((int) $device->post_id) . '의 주요 사양은 ' . implode(', ', array_slice($facts, 0, 4)) . '입니다.'
+        : pc_product_name((int) $device->post_id) . '의 출시 정보와 전체 하드웨어 사양을 정리한 페이지입니다.';
     if ($status) {
         $generated_summary .= ' 출시 상태는 ' . $status . '로 표시되어 있습니다.';
     }
@@ -168,7 +168,7 @@ function pc_device_insights(object $device): array
     $faqs = [];
     if ($announced) {
         $faqs[] = [
-            'question' => $device->model . '은 언제 발표됐나요?',
+            'question' => pc_product_name((int) $device->post_id) . '은 언제 발표됐나요?',
             'answer' => $announced . '에 발표된 것으로 기록되어 있습니다.',
         ];
     }
@@ -394,7 +394,8 @@ function pc_compare_insights(object $a, object $b): array
             continue;
         }
         $a_wins = $preference === 'larger' ? $av > $bv : $av < $bv;
-        $winner = $a_wins ? $a->model : $b->model;
+        $winner_device = $a_wins ? $a : $b;
+        $winner = pc_product_name((int) $winner_device->post_id);
         $difference = abs($av - $bv);
         $note = $label === '무게' || $label === '두께'
             ? $winner . '이(가) ' . number_format_i18n($difference, 1) . $unit . ' 더 ' . ($label === '무게' ? '가볍습니다.' : '얇습니다.')
@@ -441,9 +442,11 @@ function pc_compare_insights(object $a, object $b): array
     $a_reasons = array_slice(array_values(array_unique($a_reasons)), 0, 4);
     $b_reasons = array_slice(array_values(array_unique($b_reasons)), 0, 4);
     if ($a_reasons || $b_reasons) {
-        $verdict = $a->model . '과 ' . $b->model . '은(는) 사양별 강점이 다릅니다. '
-            . ($a_reasons ? $a->model . '은(는) ' . $a_reasons[0] . ' ' : '')
-            . ($b_reasons ? $b->model . '은(는) ' . $b_reasons[0] : '');
+        $name_a = pc_product_name((int) $a->post_id);
+        $name_b = pc_product_name((int) $b->post_id);
+        $verdict = $name_a . '과 ' . $name_b . '은(는) 사양별 강점이 다릅니다. '
+            . ($a_reasons ? $name_a . '은(는) ' . $a_reasons[0] . ' ' : '')
+            . ($b_reasons ? $name_b . '은(는) ' . $b_reasons[0] : '');
     } else {
         $verdict = '두 기기의 핵심 수치 차이가 제한적입니다. 아래 전체 스펙에서 지원 기능과 세부 구성을 확인하세요.';
     }

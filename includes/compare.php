@@ -159,6 +159,91 @@ function pc_device_release_year(object $device): ?int
     return null;
 }
 
+function pc_phone_comparison_family(object $device): string
+{
+    $model = strtolower((string) $device->model);
+    foreach ([
+        '/iphone\s*(\d+)/' => 'iphone-$1',
+        '/galaxy\s*s(\d+)/' => 'galaxy-s$1',
+        '/galaxy\s*z\s*fold\s*(\d+)/' => 'galaxy-fold-$1',
+        '/galaxy\s*z\s*flip\s*(\d+)/' => 'galaxy-flip-$1',
+        '/pixel\s*(\d+)/' => 'pixel-$1',
+    ] as $pattern => $family) {
+        if (preg_match($pattern, $model, $match)) {
+            return str_replace('$1', $match[1], $family);
+        }
+    }
+    return sanitize_title((string) $device->brand);
+}
+
+function pc_phone_comparison_score(object $a, object $b): float
+{
+    $year_a = pc_device_release_year($a) ?: 0;
+    $year_b = pc_device_release_year($b) ?: 0;
+    $score = max($year_a, $year_b) * 0.01;
+    $same_brand = strcasecmp((string) $a->brand, (string) $b->brand) === 0;
+    if ($same_brand) {
+        $score += 35;
+    }
+    if (pc_phone_comparison_family($a) === pc_phone_comparison_family($b)) {
+        $score += 65;
+    }
+    $year_gap = $year_a && $year_b ? abs($year_a - $year_b) : 99;
+    if ($year_gap === 0) {
+        $score += 30;
+    } elseif ($year_gap === 1) {
+        $score += 18;
+    }
+    $brands = array_map('strtolower', [(string) $a->brand, (string) $b->brand]);
+    sort($brands);
+    if ($brands === ['apple', 'samsung'] && $year_gap <= 1) {
+        $score += 20;
+    }
+    $score += min(10, (float) get_post_meta((int) $a->post_id, '_pc_popularity', true));
+    $score += min(10, (float) get_post_meta((int) $b->post_id, '_pc_popularity', true));
+    return $score;
+}
+
+function pc_priority_comparisons_for_device(object $device, int $limit = 4): array
+{
+    $cache_key = 'pc_priority_compare_' . (int) $device->post_id . '_' . $limit;
+    $cached_ids = get_transient($cache_key);
+    if (is_array($cached_ids)) {
+        return array_values(array_filter(array_map(
+            static fn(int $post_id): ?object => pc_get_device($post_id),
+            array_map('intval', $cached_ids)
+        )));
+    }
+    $posts = (new WP_Query(array_merge([
+        'post_type' => 'phone',
+        'post_status' => 'publish',
+        'post__not_in' => [(int) $device->post_id],
+        'posts_per_page' => 36,
+        'no_found_rows' => true,
+    ], pc_newest_query_args())))->posts;
+    $ranked = [];
+    foreach ($posts as $post) {
+        $other = pc_get_device((int) $post->ID);
+        if (!$other) {
+            continue;
+        }
+        $ranked[] = ['device' => $other, 'score' => pc_phone_comparison_score($device, $other)];
+    }
+    usort($ranked, static fn(array $a, array $b): int => $b['score'] <=> $a['score']);
+    $selected = [];
+    foreach ($ranked as $candidate) {
+        if (!pc_compare_is_indexable($device, $candidate['device'])) {
+            continue;
+        }
+        $selected[] = $candidate['device'];
+        if (count($selected) >= $limit) {
+            break;
+        }
+    }
+    set_transient($cache_key, array_map(static fn(object $item): int => (int) $item->post_id, $selected), 6 * HOUR_IN_SECONDS);
+    return $selected;
+}
+
 function pc_compare_is_indexable(object $a, object $b): bool
 {
     global $wpdb;

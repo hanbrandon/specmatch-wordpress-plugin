@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SpecMatch Catalog
  * Description: 휴대폰 스펙, 비교, 제휴 상품과 프로그램매틱 SEO 페이지를 관리합니다.
- * Version: 0.1.1
+ * Version: 0.2.0
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * Author: SpecMatch
@@ -13,13 +13,14 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PC_VERSION', '0.1.1');
+define('PC_VERSION', '0.2.0');
 define('PC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PC_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 require_once PC_PLUGIN_DIR . 'includes/schema.php';
 require_once PC_PLUGIN_DIR . 'includes/content.php';
 require_once PC_PLUGIN_DIR . 'includes/catalog.php';
+require_once PC_PLUGIN_DIR . 'includes/names.php';
 require_once PC_PLUGIN_DIR . 'includes/translations.php';
 require_once PC_PLUGIN_DIR . 'includes/insights.php';
 require_once PC_PLUGIN_DIR . 'includes/compare.php';
@@ -49,6 +50,9 @@ add_action('init', 'pc_schedule_metrics_cleanup');
 add_action('pc_cleanup_old_metrics', 'pc_cleanup_old_metrics');
 add_action('init', 'pc_register_compare_routes');
 add_action('init', 'pc_register_media_routes');
+add_action('init', 'pc_maybe_schedule_phone_name_localization', 30);
+add_action('pc_localize_phone_names_batch', 'pc_localize_phone_names_batch');
+add_action('pc_localize_phone_names_hourly', 'pc_localize_phone_names_batch');
 add_action('init', 'pc_maybe_refresh_rewrite_rules', 99);
 add_action('pre_get_posts', 'pc_order_phone_archives_newest_first');
 add_action('template_redirect', 'pc_serve_phone_media');
