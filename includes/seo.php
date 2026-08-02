@@ -231,6 +231,14 @@ function pc_output_seo(): void
         if (!$device) {
             return;
         }
+        echo '<meta property="article:modified_time" content="' . esc_attr(get_post_modified_time(DATE_W3C, true, (int) $device->post_id)) . '">' . "\n";
+        $offers = array_values(array_filter(
+            pc_get_offers((int) $device->id),
+            static fn($offer): bool => (float) $offer->price > 0 && !empty($offer->affiliate_url)
+        ));
+        if (!$offers) {
+            return;
+        }
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'Product',
@@ -247,7 +255,15 @@ function pc_output_seo(): void
         $insights = pc_device_insights($device);
         $description = $insights['summary'];
         $schema['description'] = $description;
-        echo '<meta property="article:modified_time" content="' . esc_attr(get_post_modified_time(DATE_W3C, true, (int) $device->post_id)) . '">' . "\n";
+        $schema['offers'] = array_map(static function ($offer): array {
+            return [
+                '@type' => 'Offer',
+                'url' => esc_url_raw($offer->affiliate_url),
+                'price' => (string) $offer->price,
+                'priceCurrency' => strtoupper((string) $offer->currency),
+                'seller' => ['@type' => 'Organization', 'name' => (string) $offer->merchant],
+            ];
+        }, $offers);
         echo '<script type="application/ld+json">' .
             wp_json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) .
             '</script>' . "\n";
@@ -256,23 +272,7 @@ function pc_output_seo(): void
 
     if (is_singular(['laptop', 'cpu', 'gpu'])) {
         $post_id = (int) get_queried_object_id();
-        $data = pc_tech_seo_data($post_id);
-        $schema = [
-            '@context' => 'https://schema.org',
-            '@type' => 'Product',
-            'name' => $data['name'],
-            'url' => get_permalink($post_id),
-            'description' => $data['description'],
-            'category' => $data['type'],
-        ];
-        if ($data['brand']) {
-            $schema['brand'] = ['@type' => 'Brand', 'name' => $data['brand']];
-        }
         echo '<meta property="article:modified_time" content="' . esc_attr(get_post_modified_time(DATE_W3C, true, $post_id)) . '">' . "\n";
-        echo '<script type="application/ld+json">' . wp_json_encode(
-            $schema,
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-        ) . '</script>' . "\n";
         return;
     }
 

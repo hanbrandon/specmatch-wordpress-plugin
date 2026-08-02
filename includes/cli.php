@@ -246,6 +246,16 @@ class PC_Import_Command
                 $item['source_id']
             )
         );
+        if (!$existing_post) {
+            $existing_post = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT post_id FROM {$wpdb->postmeta}
+                     WHERE meta_key = '_pc_source_id' AND meta_value = %s
+                     ORDER BY post_id ASC LIMIT 1",
+                    (string) $item['source_id']
+                )
+            );
+        }
 
         $post_id = wp_insert_post([
             'ID' => $existing_post ? (int) $existing_post : 0,
@@ -277,7 +287,7 @@ class PC_Import_Command
         pc_assign_product_series((int) $post_id);
 
         $now = current_time('mysql', true);
-        $wpdb->replace($devices, [
+        $replaced = $wpdb->replace($devices, [
             'post_id' => $post_id,
             'source_id' => $item['source_id'],
             'brand' => $item['brand'],
@@ -291,7 +301,7 @@ class PC_Import_Command
             'os' => $item['os'] ?? null,
             'chipset' => $item['chipset'] ?? null,
             'display' => $item['display'] ?? null,
-            'camera' => $item['camera'] ?? null,
+            'camera' => isset($item['camera']) ? mb_substr((string) $item['camera'], 0, 240) : null,
             'battery' => $item['battery'] ?? null,
             'ram' => $item['ram'] ?? null,
             'storage' => $item['storage'] ?? null,
@@ -299,6 +309,11 @@ class PC_Import_Command
             'source_updated_at' => $item['updated_at'] ?? null,
             'updated_at' => $now,
         ]);
+        if ($replaced === false) {
+            throw new RuntimeException(
+                '기기 테이블 저장 실패 (source_id ' . (int) $item['source_id'] . '): ' . $wpdb->last_error
+            );
+        }
 
         $device_id = (int) $wpdb->get_var(
             $wpdb->prepare("SELECT id FROM {$devices} WHERE source_id = %d", $item['source_id'])
