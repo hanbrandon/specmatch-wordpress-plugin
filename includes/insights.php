@@ -104,7 +104,7 @@ function pc_device_insights(object $device): array
     if ($status) {
         $generated_summary .= ' 출시 상태는 ' . $status . '로 표시되어 있습니다.';
     }
-    $summary = pc_get_ai_content((int) $device->id, 'summary') ?: $generated_summary;
+    $summary = pc_public_text(pc_get_ai_content((int) $device->id, 'summary') ?: $generated_summary);
 
     $pros = [];
     $cons = [];
@@ -195,10 +195,14 @@ function pc_device_insights(object $device): array
 
     return [
         'summary' => $summary,
-        'pros' => array_slice(array_values(array_unique($pros)), 0, 6),
-        'cons' => array_slice(array_values(array_unique($cons)), 0, 6),
-        'recommended' => array_slice(array_values(array_unique($recommended)), 0, 4),
-        'faqs' => array_slice($faqs, 0, 4),
+        'pros' => array_map('pc_public_text', array_slice(array_values(array_unique($pros)), 0, 6)),
+        'cons' => array_map('pc_public_text', array_slice(array_values(array_unique($cons)), 0, 6)),
+        'recommended' => array_map('pc_public_text', array_slice(array_values(array_unique($recommended)), 0, 4)),
+        'faqs' => array_map(static function (array $faq): array {
+            $faq['question'] = pc_public_text($faq['question']);
+            $faq['answer'] = pc_public_text($faq['answer']);
+            return $faq;
+        }, array_slice($faqs, 0, 4)),
         'facts' => compact(
             'technology', 'announced', 'status', 'weight_text', 'dimensions',
             'display_type', 'display_size', 'os', 'chipset', 'card_slot',

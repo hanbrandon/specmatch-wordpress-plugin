@@ -50,7 +50,8 @@ function pc_localize_public_value(?string $value): string
     $value = (string) preg_replace('/\bComing soon\.\s*/i', '출시 예정. ', $value);
     $value = (string) preg_replace('/\bDiscontinued\.\s*/i', '단종. ', $value);
 
-    return trim((string) preg_replace('/\s+([.,;])/u', '$1', $value));
+    $value = trim((string) preg_replace('/\s+([.,;])/u', '$1', $value));
+    return function_exists('pc_apply_detail_mappings') ? pc_apply_detail_mappings($value) : $value;
 }
 
 function pc_public_image_url(?object $device): ?string

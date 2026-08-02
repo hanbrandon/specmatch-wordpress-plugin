@@ -12,7 +12,7 @@ function pc_default_name_mappings(): array
         'Samsung' => '삼성', 'Huawei' => '화웨이', 'Xiaomi' => '샤오미', 'Apple' => '애플',
         'Galaxy' => '갤럭시', 'iPhone' => '아이폰', 'iPad' => '아이패드',
         'Pro Max' => '프로 맥스', 'Pro' => '프로', 'Ultra' => '울트라', 'Plus' => '플러스',
-        'Mini' => '미니', 'Air' => '에어', 'Fold' => '폴드', 'Flip' => '플립',
+        'Mini' => '미니', 'Air' => '에어', 'Watch' => '워치', 'Fold' => '폴드', 'Flip' => '플립',
         'Note' => '노트', 'Tab' => '탭',
     ];
 }
@@ -21,6 +21,24 @@ function pc_name_mappings(): array
 {
     $saved = get_option('pc_name_mappings');
     return is_array($saved) && $saved ? $saved : pc_default_name_mappings();
+}
+
+function pc_detail_mappings(): array
+{
+    $saved = get_option('pc_detail_mappings');
+    return is_array($saved) ? $saved : [];
+}
+
+function pc_apply_detail_mappings(string $text): string
+{
+    $mappings = pc_detail_mappings();
+    uksort($mappings, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
+    foreach ($mappings as $english => $korean) {
+        if ($english !== '' && $korean !== '') {
+            $text = str_ireplace($english, $korean, $text);
+        }
+    }
+    return $text;
 }
 
 function pc_apply_name_mappings(string $name): string
@@ -32,6 +50,7 @@ function pc_apply_name_mappings(string $name): string
             $name = (string) preg_replace('/(?<![A-Za-z])' . preg_quote($english, '/') . '(?![A-Za-z])/i', $korean, $name);
         }
     }
+    $name = (string) preg_replace('/([가-힣])(\d)/u', '$1 $2', $name);
     return trim((string) preg_replace('/\s+/u', ' ', $name));
 }
 
@@ -59,8 +78,20 @@ function pc_phone_search_aliases(string $original, string $localized, string $br
 
 function pc_product_name(int $post_id): string
 {
-    $localized = (string) get_post_meta($post_id, '_pc_name_ko', true);
-    return $localized ?: get_the_title($post_id);
+    $original = (string) get_post_meta($post_id, '_pc_name_en', true);
+    if ($original === '') {
+        $device = pc_get_device($post_id);
+        $original = (string) ($device?->model ?: get_post_field('post_title', $post_id));
+    }
+    return $original !== '' ? pc_phone_name_ko($original) : (string) get_post_field('post_title', $post_id);
+}
+
+function pc_filter_phone_title(string $title, int $post_id = 0): string
+{
+    if (is_admin() || !$post_id || get_post_type($post_id) !== 'phone') {
+        return $title;
+    }
+    return pc_product_name($post_id);
 }
 
 function pc_product_original_name(int $post_id): string
@@ -146,6 +177,15 @@ function pc_name_mapping_admin_page(): void
             }
         }
         update_option('pc_name_mappings', $mappings ?: pc_default_name_mappings(), false);
+
+        $detail_mappings = [];
+        foreach (preg_split('/\R/u', (string) wp_unslash($_POST['pc_detail_mappings'] ?? '')) as $line) {
+            $parts = array_map('trim', explode('=', $line, 2));
+            if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {
+                $detail_mappings[sanitize_text_field($parts[0])] = sanitize_text_field($parts[1]);
+            }
+        }
+        update_option('pc_detail_mappings', $detail_mappings, false);
         delete_post_meta_by_key('_pc_name_rule_version');
         if (!wp_next_scheduled('pc_localize_phone_names_batch')) {
             wp_schedule_single_event(time() + 5, 'pc_localize_phone_names_batch');
@@ -155,6 +195,8 @@ function pc_name_mapping_admin_page(): void
 
     $lines = [];
     foreach (pc_name_mappings() as $english => $korean) $lines[] = $english . '=' . $korean;
+    $detail_lines = [];
+    foreach (pc_detail_mappings() as $english => $korean) $detail_lines[] = $english . '=' . $korean;
     ?>
     <div class="wrap">
         <h1>제품명 맵핑</h1>
@@ -162,6 +204,9 @@ function pc_name_mapping_admin_page(): void
         <form method="post">
             <?php wp_nonce_field('pc_save_name_mappings'); ?>
             <textarea name="pc_name_mappings" rows="18" class="large-text code"><?php echo esc_textarea(implode("\n", $lines)); ?></textarea>
+            <h2>상세설명 맵핑</h2>
+            <p>스펙 값과 상세설명에서 바꿀 문구를 입력하세요. 문장 일부도 치환할 수 있습니다.</p>
+            <textarea name="pc_detail_mappings" rows="12" class="large-text code" placeholder="Sapphire crystal front=사파이어 크리스털 전면\nAlways-on display=상시표시 디스플레이"><?php echo esc_textarea(implode("\n", $detail_lines)); ?></textarea>
             <p><button type="submit" name="pc_save_name_mappings" class="button button-primary">맵핑 저장</button></p>
         </form>
     </div>

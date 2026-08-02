@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SpecMatch Catalog
  * Description: 휴대폰 스펙, 비교, 제휴 상품과 프로그램매틱 SEO 페이지를 관리합니다.
- * Version: 0.2.1
+ * Version: 0.2.2
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * Author: SpecMatch
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PC_VERSION', '0.2.1');
+define('PC_VERSION', '0.2.2');
 define('PC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PC_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -67,6 +67,7 @@ add_filter('template_include', 'pc_compare_template');
 add_filter('template_include', 'pc_series_template');
 add_filter('wp_robots', 'pc_prevent_public_image_indexing');
 add_filter('document_title_parts', 'pc_document_title_parts');
+add_filter('the_title', 'pc_filter_phone_title', 10, 2);
 add_action('wp_head', 'pc_output_seo', 20);
 add_action('template_redirect', 'pc_redirect_legacy_hardware_brand_url', 5);
 add_action('template_redirect', 'pc_catalog_empty_filter_status', 20);
