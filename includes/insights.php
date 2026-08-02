@@ -69,7 +69,7 @@ function pc_device_insights(object $device): array
 {
     $map = pc_device_spec_map((int) $device->id);
     $technology = pc_fact($map, ['network|technology']);
-    $announced = pc_fact($map, ['launch|announced']) ?: $device->announced;
+    $announced = pc_public_text(pc_fact($map, ['launch|announced']) ?: $device->announced);
     $status = pc_fact($map, ['launch|status']) ?: $device->status;
     $weight_text = pc_fact($map, ['body|weight']);
     $dimensions = pc_fact($map, ['body|dimensions']);

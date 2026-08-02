@@ -4,44 +4,41 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-const PC_PHONE_NAME_VERSION = '2';
+const PC_PHONE_NAME_VERSION = '3';
+
+function pc_default_name_mappings(): array
+{
+    return [
+        'Samsung' => '삼성', 'Huawei' => '화웨이', 'Xiaomi' => '샤오미', 'Apple' => '애플',
+        'Galaxy' => '갤럭시', 'iPhone' => '아이폰', 'iPad' => '아이패드',
+        'Pro Max' => '프로 맥스', 'Pro' => '프로', 'Ultra' => '울트라', 'Plus' => '플러스',
+        'Mini' => '미니', 'Air' => '에어', 'Fold' => '폴드', 'Flip' => '플립',
+        'Note' => '노트', 'Tab' => '탭',
+    ];
+}
+
+function pc_name_mappings(): array
+{
+    $saved = get_option('pc_name_mappings');
+    return is_array($saved) && $saved ? $saved : pc_default_name_mappings();
+}
+
+function pc_apply_name_mappings(string $name): string
+{
+    $mappings = pc_name_mappings();
+    uksort($mappings, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
+    foreach ($mappings as $english => $korean) {
+        if ($english !== '' && $korean !== '') {
+            $name = (string) preg_replace('/(?<![A-Za-z])' . preg_quote($english, '/') . '(?![A-Za-z])/i', $korean, $name);
+        }
+    }
+    return trim((string) preg_replace('/\s+/u', ' ', $name));
+}
 
 function pc_phone_name_ko(string $model, string $brand = ''): string
 {
     $name = trim(preg_replace('/\s+/', ' ', $model));
-    $brand_key = strtolower(trim($brand));
-
-    if ($brand_key === 'apple' || preg_match('/^Apple\s+/i', $name)) {
-        $name = preg_replace('/^Apple\s+/i', '', $name);
-        $replacements = [
-            '/\biPhone\s*/i' => '아이폰 ',
-            '/\biPad\s*/i' => '아이패드 ',
-            '/\bPro\s*Max\b/i' => '프로 맥스',
-            '/\bPro\b/i' => '프로',
-            '/\bPlus\b/i' => '플러스',
-            '/\bAir\b/i' => '에어',
-            '/\bMini\b/i' => '미니',
-        ];
-        return trim(preg_replace('/\s+/', ' ', preg_replace(array_keys($replacements), array_values($replacements), $name)));
-    }
-
-    if ($brand_key === 'samsung' || preg_match('/^Samsung\s+/i', $name)) {
-        $name = preg_replace('/^Samsung\s+/i', '', $name);
-        $replacements = [
-            '/\bGalaxy\s*/i' => '갤럭시 ',
-            '/\bZ\s*Fold\s*(\d*)/i' => 'Z 폴드 $1',
-            '/\bZ\s*Flip\s*(\d*)/i' => 'Z 플립 $1',
-            '/\bUltra\b/i' => '울트라',
-            '/\bPlus\b/i' => '플러스',
-            '/\bNote\s*/i' => '노트 ',
-            '/\bTab\s*/i' => '탭 ',
-            '/\bFold\b/i' => '폴드',
-            '/\bFlip\b/i' => '플립',
-        ];
-        return trim(preg_replace('/\s+/', ' ', preg_replace(array_keys($replacements), array_values($replacements), $name)));
-    }
-
-    return $name;
+    return pc_apply_name_mappings($name);
 }
 
 function pc_phone_search_aliases(string $original, string $localized, string $brand = ''): string
@@ -74,7 +71,7 @@ function pc_product_original_name(int $post_id): string
 function pc_localize_phone_post(int $post_id): bool
 {
     $device = pc_get_device($post_id);
-    if (!$device || !in_array(strtolower((string) $device->brand), ['apple', 'samsung'], true)) {
+    if (!$device) {
         return false;
     }
 
@@ -114,8 +111,7 @@ function pc_localize_phone_names_batch(): void
     $rows = $wpdb->get_results(
         "SELECT d.post_id FROM {$devices} d
          LEFT JOIN {$wpdb->postmeta} v ON v.post_id=d.post_id AND v.meta_key='_pc_name_rule_version'
-         WHERE LOWER(d.brand) IN ('apple','samsung')
-           AND (v.meta_id IS NULL OR v.meta_value <> '" . esc_sql(PC_PHONE_NAME_VERSION) . "')
+         WHERE v.meta_id IS NULL OR v.meta_value <> '" . esc_sql(PC_PHONE_NAME_VERSION) . "'
          ORDER BY d.post_id ASC LIMIT 100"
     );
     foreach ($rows as $row) {
@@ -129,6 +125,47 @@ function pc_localize_phone_names_batch(): void
 function pc_maybe_schedule_phone_name_localization(): void
 {
     pc_schedule_phone_name_localization();
+}
+
+function pc_name_mapping_admin_menu(): void
+{
+    add_options_page('제품명 맵핑', '제품명 맵핑', 'manage_options', 'pc-name-mappings', 'pc_name_mapping_admin_page');
+}
+
+function pc_name_mapping_admin_page(): void
+{
+    if (!current_user_can('manage_options')) return;
+
+    if (isset($_POST['pc_save_name_mappings'])) {
+        check_admin_referer('pc_save_name_mappings');
+        $mappings = [];
+        foreach (preg_split('/\R/u', (string) wp_unslash($_POST['pc_name_mappings'] ?? '')) as $line) {
+            $parts = array_map('trim', explode('=', $line, 2));
+            if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {
+                $mappings[sanitize_text_field($parts[0])] = sanitize_text_field($parts[1]);
+            }
+        }
+        update_option('pc_name_mappings', $mappings ?: pc_default_name_mappings(), false);
+        delete_post_meta_by_key('_pc_name_rule_version');
+        if (!wp_next_scheduled('pc_localize_phone_names_batch')) {
+            wp_schedule_single_event(time() + 5, 'pc_localize_phone_names_batch');
+        }
+        echo '<div class="notice notice-success"><p>맵핑을 저장했습니다. 기존 제품명도 순차적으로 다시 적용됩니다.</p></div>';
+    }
+
+    $lines = [];
+    foreach (pc_name_mappings() as $english => $korean) $lines[] = $english . '=' . $korean;
+    ?>
+    <div class="wrap">
+        <h1>제품명 맵핑</h1>
+        <p>한 줄에 <code>영문=한국어</code> 형식으로 입력하세요. 원본 영문명과 기존 URL은 유지되어 영문 검색도 가능합니다.</p>
+        <form method="post">
+            <?php wp_nonce_field('pc_save_name_mappings'); ?>
+            <textarea name="pc_name_mappings" rows="18" class="large-text code"><?php echo esc_textarea(implode("\n", $lines)); ?></textarea>
+            <p><button type="submit" name="pc_save_name_mappings" class="button button-primary">맵핑 저장</button></p>
+        </form>
+    </div>
+    <?php
 }
 
 function pc_search_post_ids(string $keyword, string $post_type = 'phone', int $limit = 50): array

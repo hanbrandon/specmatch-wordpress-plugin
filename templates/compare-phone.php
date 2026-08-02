@@ -132,8 +132,8 @@ get_header();
                 <?php endif; ?>
                 <div class="compare-row <?php echo $row['same'] ? 'is-same' : ''; ?>" <?php echo $row['same'] ? 'hidden' : ''; ?>>
                     <?php if (function_exists('ps_spec_label')) ps_spec_label($row['section'], $row['field'], 'compare-help-' . md5($row['section'] . '|' . $row['field'])); ?>
-                    <span><?php echo esc_html($row['a'] ?: '—'); ?></span>
-                    <span><?php echo esc_html($row['b'] ?: '—'); ?></span>
+                    <span><?php echo esc_html($row['a'] ? pc_public_text((string) $row['a']) : '—'); ?></span>
+                    <span><?php echo esc_html($row['b'] ? pc_public_text((string) $row['b']) : '—'); ?></span>
                 </div>
             <?php endforeach; ?>
         </section>

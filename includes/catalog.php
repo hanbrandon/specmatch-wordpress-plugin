@@ -18,7 +18,39 @@ function pc_public_text(?string $text): string
     if (!$text) {
         return '';
     }
-    return trim((string) preg_replace('/\bGSMArena(?:\.com)?\b/i', '', $text));
+    $text = trim((string) preg_replace('/\bGSMArena(?:\.com)?\b/i', '', $text));
+    return pc_localize_public_value($text);
+}
+
+function pc_localize_public_value(?string $value): string
+{
+    $value = trim((string) $value);
+    if ($value === '') {
+        return '';
+    }
+
+    $months = [
+        'January' => 1, 'February' => 2, 'March' => 3, 'April' => 4,
+        'May' => 5, 'June' => 6, 'July' => 7, 'August' => 8,
+        'September' => 9, 'October' => 10, 'November' => 11, 'December' => 12,
+    ];
+    $month_pattern = implode('|', array_keys($months));
+    $value = (string) preg_replace_callback(
+        '/\b((?:19|20)\d{2})\s*,?\s*(' . $month_pattern . ')(?:\s+(\d{1,2}))?\b/i',
+        static function (array $match) use ($months): string {
+            $month = $months[ucfirst(strtolower($match[2]))] ?? 0;
+            return $match[1] . '년 ' . $month . '월' . (!empty($match[3]) ? ' ' . (int) $match[3] . '일' : '');
+        },
+        $value
+    );
+
+    $value = (string) preg_replace('/\bReleased\s+(.+?)(?=(?:\.|;|$))/i', '$1 출시', $value);
+    $value = (string) preg_replace('/\bAnnounced\s+(.+?)(?=(?:\.|;|$))/i', '$1 발표', $value);
+    $value = (string) preg_replace('/\bAvailable\.\s*/i', '출시됨. ', $value);
+    $value = (string) preg_replace('/\bComing soon\.\s*/i', '출시 예정. ', $value);
+    $value = (string) preg_replace('/\bDiscontinued\.\s*/i', '단종. ', $value);
+
+    return trim((string) preg_replace('/\s+([.,;])/u', '$1', $value));
 }
 
 function pc_public_image_url(?object $device): ?string

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SpecMatch Catalog
  * Description: 휴대폰 스펙, 비교, 제휴 상품과 프로그램매틱 SEO 페이지를 관리합니다.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Requires at least: 6.6
  * Requires PHP: 8.1
  * Author: SpecMatch
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PC_VERSION', '0.2.0');
+define('PC_VERSION', '0.2.1');
 define('PC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('PC_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -51,6 +51,7 @@ add_action('pc_cleanup_old_metrics', 'pc_cleanup_old_metrics');
 add_action('init', 'pc_register_compare_routes');
 add_action('init', 'pc_register_media_routes');
 add_action('init', 'pc_maybe_schedule_phone_name_localization', 30);
+add_action('admin_menu', 'pc_name_mapping_admin_menu');
 add_action('pc_localize_phone_names_batch', 'pc_localize_phone_names_batch');
 add_action('pc_localize_phone_names_hourly', 'pc_localize_phone_names_batch');
 add_action('init', 'pc_maybe_refresh_rewrite_rules', 99);
