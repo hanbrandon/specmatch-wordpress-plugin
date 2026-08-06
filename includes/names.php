@@ -216,17 +216,86 @@ function pc_name_mapping_admin_page(): void
 function pc_search_post_ids(string $keyword, string $post_type = 'phone', int $limit = 50): array
 {
     global $wpdb;
-    $keyword = trim($keyword);
+    $keyword = trim(sanitize_text_field($keyword));
     if ($keyword === '') {
         return [];
     }
-    $like = '%' . $wpdb->esc_like($keyword) . '%';
-    $types = in_array($post_type, ['phone', 'laptop', 'cpu', 'gpu'], true) ? [$post_type] : ['phone', 'laptop', 'cpu', 'gpu'];
+
+    $types = in_array($post_type, ['phone', 'laptop', 'cpu', 'gpu'], true)
+        ? [$post_type]
+        : ['phone', 'laptop', 'cpu', 'gpu'];
+    $limit = max(1, min(5000, $limit));
+    $cache_key = 'pc_search_' . md5($keyword . '|' . implode(',', $types) . '|' . $limit);
+    $cached = get_transient($cache_key);
+    if (is_array($cached)) {
+        return array_map('intval', $cached);
+    }
+
+    $normalize = static function (string $expression): string {
+        foreach ([' ', '-', '_', '/', '.', ',', '(', ')'] as $character) {
+            $expression = "REPLACE({$expression}, '" . esc_sql($character) . "', '')";
+        }
+        return "LOWER({$expression})";
+    };
+    $compact = mb_strtolower((string) preg_replace('/[\s\-_\/.,()]+/u', '', $keyword));
+    $tokens = array_values(array_unique(array_filter(
+        preg_split('/[\s\-_\/.,()]+/u', mb_strtolower($keyword)),
+        static fn(string $token): bool => $token !== ''
+    )));
+
+    $devices = pc_table('devices');
     $type_placeholders = implode(',', array_fill(0, count($types), '%s'));
-    $sql = "SELECT DISTINCT p.ID FROM {$wpdb->posts} p
+    $haystack = "CONCAT_WS(' ', p.post_title, COALESCE(a.meta_value,''), COALESCE(d.brand,''), COALESCE(d.model,''), COALESCE(d.chipset,''), COALESCE(d.os,''), COALESCE(d.display,''), COALESCE(d.camera,''), COALESCE(d.battery,''), COALESCE(d.ram,''), COALESCE(d.storage,''), COALESCE(ts.meta_value,''))";
+    $normalized_title = $normalize('p.post_title');
+    $normalized_alias = $normalize("COALESCE(a.meta_value,'')");
+    $normalized_model = $normalize("COALESCE(d.model,'')");
+    $normalized_haystack = $normalize($haystack);
+    $normalized_specs = $normalize("COALESCE(s.field_value,'')");
+
+    $match_parts = ["{$normalized_haystack} LIKE %s", "EXISTS (SELECT 1 FROM " . pc_table('specs') . " s WHERE s.device_id=d.id AND {$normalized_specs} LIKE %s)"];
+    $match_args = ['%' . $wpdb->esc_like($compact) . '%', '%' . $wpdb->esc_like($compact) . '%'];
+    $token_parts = [];
+    $token_args = [];
+    foreach ($tokens as $token) {
+        $like = '%' . $wpdb->esc_like($token) . '%';
+        $token_parts[] = "({$haystack} LIKE %s OR EXISTS (SELECT 1 FROM " . pc_table('specs') . " sx WHERE sx.device_id=d.id AND CONCAT_WS(' ', sx.field_name, sx.field_value) LIKE %s))";
+        $token_args[] = $like;
+        $token_args[] = $like;
+    }
+    if ($token_parts) {
+        $match_parts[] = '(' . implode(' AND ', $token_parts) . ')';
+        $match_args = array_merge($match_args, $token_args);
+    }
+
+    $sql = "SELECT DISTINCT p.ID,
+                CASE
+                    WHEN {$normalized_title} = %s THEN 1000
+                    WHEN CONCAT('|', {$normalized_alias}, '|') LIKE %s THEN 950
+                    WHEN {$normalized_title} LIKE %s THEN 900
+                    WHEN {$normalized_title} LIKE %s THEN 850
+                    WHEN {$normalized_title} LIKE %s THEN 700
+                    WHEN {$normalized_alias} LIKE %s THEN 650
+                    WHEN {$normalized_model} LIKE %s THEN 625
+                    ELSE 400
+                END AS relevance,
+                COALESCE(rd.meta_value, '0000-00-00') AS release_date
+            FROM {$wpdb->posts} p
             LEFT JOIN {$wpdb->postmeta} a ON a.post_id=p.ID AND a.meta_key='_pc_search_aliases'
+            LEFT JOIN {$wpdb->postmeta} ts ON ts.post_id=p.ID AND ts.meta_key='_tech_specs'
+            LEFT JOIN {$wpdb->postmeta} rd ON rd.post_id=p.ID AND rd.meta_key='_catalog_release_date'
+            LEFT JOIN {$devices} d ON d.post_id=p.ID
             WHERE p.post_status='publish' AND p.post_type IN ({$type_placeholders})
-              AND (p.post_title LIKE %s OR a.meta_value LIKE %s)
-            ORDER BY p.post_date DESC LIMIT %d";
-    return array_map('intval', $wpdb->get_col($wpdb->prepare($sql, ...array_merge($types, [$like, $like, $limit]))));
+              AND (" . implode(' OR ', $match_parts) . ")
+            ORDER BY relevance DESC, release_date DESC, p.post_title ASC
+            LIMIT %d";
+    $compact_like = '%' . $wpdb->esc_like($compact) . '%';
+    $args = array_merge(
+        [$compact, '%|' . $wpdb->esc_like($compact) . '|%', '%' . $wpdb->esc_like($compact), $wpdb->esc_like($compact) . '%', $compact_like, $compact_like, $compact_like],
+        $types,
+        $match_args,
+        [$limit]
+    );
+    $ids = array_map('intval', $wpdb->get_col($wpdb->prepare($sql, ...$args)));
+    set_transient($cache_key, $ids, 5 * MINUTE_IN_SECONDS);
+    return $ids;
 }
