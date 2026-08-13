@@ -480,6 +480,17 @@ function pc_prevent_public_image_indexing(array $robots): array
         $robots['noindex'] = true;
         $robots['follow'] = true;
     }
+    if (is_singular('ssd') && function_exists('ps_ssd_content_grade') && ps_ssd_content_grade((int) get_queried_object_id()) !== 'A') {
+        $robots['noindex'] = true;
+        $robots['follow'] = true;
+    }
+    if (pc_is_compare() && pc_compare_type() === 'ssd' && function_exists('ps_ssd_content_grade')) {
+        [$ssd_a, $ssd_b] = pc_compare_tech_posts();
+        if (!$ssd_a || !$ssd_b || ps_ssd_content_grade((int) $ssd_a->ID) !== 'A' || ps_ssd_content_grade((int) $ssd_b->ID) !== 'A') {
+            $robots['noindex'] = true;
+            $robots['follow'] = true;
+        }
+    }
     $host = strtolower((string) wp_parse_url(home_url('/'), PHP_URL_HOST));
     if (
         $host === 'localhost'
@@ -492,6 +503,45 @@ function pc_prevent_public_image_indexing(array $robots): array
     }
     return $robots;
 }
+
+function pc_low_value_ssd_ids(): array
+{
+    if (!function_exists('ps_ssd_content_grade')) return [];
+    $cached = get_transient('pc_low_value_ssd_ids_v1');
+    if (is_array($cached)) return array_map('intval', $cached);
+    $ids = get_posts(['post_type' => 'ssd', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids', 'no_found_rows' => true]);
+    $excluded = array_values(array_filter(array_map('intval', $ids), static fn(int $id): bool => ps_ssd_content_grade($id) !== 'A'));
+    set_transient('pc_low_value_ssd_ids_v1', $excluded, 12 * HOUR_IN_SECONDS);
+    return $excluded;
+}
+
+function pc_exclude_low_value_ssds_from_yoast(array $ids): array
+{
+    return array_values(array_unique(array_merge($ids, pc_low_value_ssd_ids())));
+}
+add_filter('wpseo_exclude_from_sitemap_by_post_ids', 'pc_exclude_low_value_ssds_from_yoast');
+
+function pc_should_suppress_ads(): bool
+{
+    if (is_admin() || wp_doing_ajax() || is_feed() || is_robots()) return false;
+    if (pc_catalog_filter_active()) return true;
+    if (is_search() || is_404() || is_page('compare')) return true;
+    if (is_singular('ssd') && function_exists('ps_ssd_content_grade')) return ps_ssd_content_grade((int) get_queried_object_id()) !== 'A';
+    if (pc_is_compare() && pc_compare_type() === 'ssd' && function_exists('ps_ssd_content_grade')) {
+        [$a, $b] = pc_compare_tech_posts();
+        return !$a || !$b || ps_ssd_content_grade((int) $a->ID) !== 'A' || ps_ssd_content_grade((int) $b->ID) !== 'A';
+    }
+    return false;
+}
+
+function pc_start_ad_suppression_buffer(): void
+{
+    if (!pc_should_suppress_ads()) return;
+    ob_start(static function (string $html): string {
+        return (string) preg_replace('#<script[^>]+src=["\'][^"\']*pagead2\.googlesyndication\.com/pagead/js/adsbygoogle\.js[^"\']*["\'][^>]*></script>\s*#i', '', $html);
+    });
+}
+add_action('template_redirect', 'pc_start_ad_suppression_buffer', 2);
 
 function pc_redirect_legacy_hardware_brand_url(): void
 {

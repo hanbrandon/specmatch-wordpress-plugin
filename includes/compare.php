@@ -100,7 +100,10 @@ function pc_compare_tech_is_indexable(WP_Post $a, WP_Post $b): bool
     if ($a->post_type === 'ssd') {
         return function_exists('ps_ssd_scorecard')
             && ps_ssd_scorecard($a->ID)['overall'] !== null
-            && ps_ssd_scorecard($b->ID)['overall'] !== null;
+            && ps_ssd_scorecard($b->ID)['overall'] !== null
+            && function_exists('ps_ssd_content_grade')
+            && ps_ssd_content_grade($a->ID) === 'A'
+            && ps_ssd_content_grade($b->ID) === 'A';
     }
     return get_post_meta($a->ID, '_tech_score', true) !== ''
         && get_post_meta($b->ID, '_tech_score', true) !== '';
