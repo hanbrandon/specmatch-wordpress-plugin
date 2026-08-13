@@ -11,6 +11,15 @@ function pc_catalog_filter_active(): bool
         || get_query_var('catalog_year')
         || get_query_var('min_score')
         || get_query_var('catalog_sort')
+        || get_query_var('ssd_capacity')
+        || get_query_var('ssd_interface')
+        || get_query_var('ssd_nand')
+        || get_query_var('ssd_cache')
+        || get_query_var('ssd_ps5')
+        || get_query_var('ssd_market')
+        || get_query_var('ssd_min_read')
+        || get_query_var('ssd_min_tbw')
+        || get_query_var('ssd_status')
     );
 }
 

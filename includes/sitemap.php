@@ -130,6 +130,8 @@ function pc_series_sitemap_urls(): array
 
 function pc_register_comparison_sitemap(): void
 {
+    add_rewrite_rule('^ssd-landing-sitemap\.xml$', 'index.php?pc_ssd_sitemap=landing', 'top');
+    add_rewrite_rule('^ssd-comparison-sitemap\.xml$', 'index.php?pc_ssd_sitemap=comparison', 'top');
     if (!function_exists('wp_register_sitemap_provider') || !class_exists('WP_Sitemaps_Provider')) {
         return;
     }
@@ -220,3 +222,50 @@ function pc_register_comparison_sitemap(): void
     };
     wp_register_sitemap_provider('product-series', $series_provider);
 }
+
+function pc_ssd_sitemap_query_vars(array $vars): array
+{
+    $vars[] = 'pc_ssd_sitemap';
+    return $vars;
+}
+add_filter('query_vars', 'pc_ssd_sitemap_query_vars');
+
+function pc_render_ssd_sitemap(): void
+{
+    $type = sanitize_key((string) get_query_var('pc_ssd_sitemap'));
+    if (!$type) {
+        $path = trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+        if ($path === 'ssd-landing-sitemap.xml') $type = 'landing';
+        elseif ($path === 'ssd-comparison-sitemap.xml') $type = 'comparison';
+    }
+    if (!in_array($type, ['landing', 'comparison'], true)) return;
+    $urls = [];
+    if ($type === 'landing') {
+        $slugs = ['1tb', '2tb', '4tb', 'nvme-gen4', 'nvme-gen5', 'sata', 'ps5-compatible', 'tlc', 'qlc', 'dram', 'hmb', 'high-endurance'];
+        $lastmod = get_lastpostmodified('GMT') ?: gmdate('Y-m-d H:i:s');
+        foreach ($slugs as $slug) $urls[] = ['loc' => home_url('/ssds/' . $slug . '/'), 'lastmod' => mysql2date(DATE_W3C, $lastmod, false)];
+    } else {
+        foreach (pc_selected_tech_comparisons(40) as $item) {
+            if (str_contains($item['url'], '/compare/ssd/')) $urls[] = ['loc' => $item['url'], 'lastmod' => mysql2date(DATE_W3C, $item['lastmod'], false)];
+        }
+    }
+    status_header(200);
+    header('Content-Type: application/xml; charset=UTF-8');
+    header('X-Robots-Tag: noindex, follow', true);
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+    foreach ($urls as $url) echo '<url><loc>' . esc_url($url['loc']) . '</loc><lastmod>' . esc_html($url['lastmod']) . '</lastmod></url>';
+    echo '</urlset>';
+    exit;
+}
+add_action('template_redirect', 'pc_render_ssd_sitemap', 0);
+
+function pc_add_ssd_sitemaps_to_yoast(string $index): string
+{
+    $date = esc_html(mysql2date(DATE_W3C, get_lastpostmodified('GMT') ?: gmdate('Y-m-d H:i:s'), false));
+    foreach (['ssd-landing-sitemap.xml', 'ssd-comparison-sitemap.xml'] as $file) {
+        $index .= '<sitemap><loc>' . esc_url(home_url('/' . $file)) . '</loc><lastmod>' . $date . '</lastmod></sitemap>';
+    }
+    return $index;
+}
+add_filter('wpseo_sitemap_index', 'pc_add_ssd_sitemaps_to_yoast');
