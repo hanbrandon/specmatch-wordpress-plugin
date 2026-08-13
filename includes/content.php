@@ -42,6 +42,7 @@ function pc_register_content_types(): void
         'laptop' => ['노트북', 'laptops', 'dashicons-laptop'],
         'cpu' => ['CPU', 'cpus', 'dashicons-performance'],
         'gpu' => ['GPU', 'gpus', 'dashicons-chart-area'],
+        'ssd' => ['SSD', 'ssds', 'dashicons-database'],
     ];
     foreach ($hardware_types as $type => [$label, $slug, $icon]) {
         register_post_type($type, [
@@ -61,7 +62,7 @@ function pc_register_content_types(): void
         ]);
     }
 
-    register_taxonomy('hardware_brand', ['laptop', 'cpu', 'gpu'], [
+    register_taxonomy('hardware_brand', ['laptop', 'cpu', 'gpu', 'ssd'], [
         'labels' => ['name' => '하드웨어 브랜드', 'singular_name' => '하드웨어 브랜드'],
         'public' => true,
         'show_in_rest' => true,
@@ -69,7 +70,7 @@ function pc_register_content_types(): void
         'rewrite' => ['slug' => 'makers', 'with_front' => false],
     ]);
 
-    foreach (['laptops' => 'laptop', 'cpus' => 'cpu', 'gpus' => 'gpu'] as $archive => $type) {
+    foreach (['laptops' => 'laptop', 'cpus' => 'cpu', 'gpus' => 'gpu', 'ssds' => 'ssd'] as $archive => $type) {
         add_rewrite_rule(
             '^' . $archive . '/brand/([^/]+)/page/([0-9]+)/?$',
             'index.php?post_type=' . $type . '&tech_brand=$matches[1]&paged=$matches[2]',
@@ -85,7 +86,7 @@ function pc_register_content_types(): void
 
 function pc_hardware_brand_url(string $post_type, string $brand, int $page = 1): string
 {
-    $archives = ['laptop' => 'laptops', 'cpu' => 'cpus', 'gpu' => 'gpus'];
+    $archives = ['laptop' => 'laptops', 'cpu' => 'cpus', 'gpu' => 'gpus', 'ssd' => 'ssds'];
     if (!isset($archives[$post_type])) {
         return home_url('/');
     }

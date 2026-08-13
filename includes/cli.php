@@ -43,7 +43,7 @@ class PC_Import_Command
             $item = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
             if ($release_only) {
                 $this->import_release_only($item);
-            } elseif (in_array($item['post_type'] ?? '', ['laptop', 'cpu', 'gpu'], true)) {
+            } elseif (in_array($item['post_type'] ?? '', ['laptop', 'cpu', 'gpu', 'ssd'], true)) {
                 $this->import_tech($item);
             } else {
                 $this->import_phone($item);
@@ -87,7 +87,7 @@ class PC_Import_Command
     private function import_tech(array $item): void
     {
         $post_type = sanitize_key($item['post_type'] ?? '');
-        if (!in_array($post_type, ['laptop', 'cpu', 'gpu'], true)) {
+        if (!in_array($post_type, ['laptop', 'cpu', 'gpu', 'ssd'], true)) {
             throw new InvalidArgumentException('지원하지 않는 제품 유형입니다.');
         }
 
@@ -107,7 +107,7 @@ class PC_Import_Command
             'post_status' => 'publish',
             'post_title' => sanitize_text_field($item['name'] ?? ''),
             'post_name' => sanitize_title($item['slug'] ?? ''),
-            'post_excerpt' => sanitize_textarea_field($item['description'] ?? ''),
+            'post_excerpt' => $this->tech_excerpt($item),
             'post_content' => $this->tech_content($item),
         ], true);
         if (is_wp_error($post_id)) {
@@ -131,7 +131,7 @@ class PC_Import_Command
 
         update_post_meta($post_id, '_tech_source_key', $source_key);
         update_post_meta($post_id, '_tech_source_url', esc_url_raw($item['source_url'] ?? ''));
-        update_post_meta($post_id, '_tech_image_url', esc_url_raw($item['image_url'] ?? ''));
+        update_post_meta($post_id, '_tech_image_url', $post_type === 'ssd' ? '' : esc_url_raw($item['image_url'] ?? ''));
         update_post_meta($post_id, '_tech_launched', sanitize_text_field($item['launched'] ?? ''));
         $this->update_release_meta($post_id, $item);
         update_post_meta($post_id, '_tech_score', $main_score);
@@ -146,6 +146,9 @@ class PC_Import_Command
 
     private function update_release_meta(int $post_id, array $item): void
     {
+        if (($item['post_type'] ?? '') === 'ssd' && empty($item['release_date'])) {
+            $item = array_merge($item, $this->ssd_release_data($item));
+        }
         $release_date = sanitize_text_field($item['release_date'] ?? '');
         $release_year = (int) ($item['release_year'] ?? 0);
         $release_state = sanitize_key($item['release_state'] ?? 'unknown');
@@ -154,6 +157,35 @@ class PC_Import_Command
         update_post_meta($post_id, '_catalog_release_precision', sanitize_key($item['release_precision'] ?? ''));
         update_post_meta($post_id, '_catalog_release_state', $release_state);
         update_post_meta($post_id, '_catalog_age_status', $this->catalog_age_status($release_date, $release_state));
+    }
+
+    private function ssd_release_data(array $item): array
+    {
+        $released = '';
+        foreach ((array) ($item['specs'] ?? []) as $spec) {
+            if (($spec['field'] ?? '') === 'Released') {
+                $released = trim((string) ($spec['value'] ?? ''));
+                break;
+            }
+        }
+        if ($released === '' || strcasecmp($released, 'Unknown') === 0) {
+            return ['release_date' => '', 'release_year' => 0, 'release_precision' => '', 'release_state' => 'unknown'];
+        }
+        $clean = preg_replace('/(\d+)(st|nd|rd|th)/i', '$1', $released) ?? $released;
+        $precision = preg_match('/^[12]\d{3}$/', $clean) ? 'year' : (preg_match('/^[A-Za-z]{3,9}\s+[12]\d{3}$/', $clean) ? 'month' : 'day');
+        $format = $precision === 'year' ? '!Y' : ($precision === 'month' ? '!M Y' : '!M j, Y');
+        $date = DateTimeImmutable::createFromFormat($format, $clean);
+        if (!$date) {
+            return ['release_date' => '', 'release_year' => 0, 'release_precision' => '', 'release_state' => 'unknown'];
+        }
+        if ($precision === 'year') $date = $date->setDate((int) $date->format('Y'), 1, 1);
+        if ($precision === 'month') $date = $date->setDate((int) $date->format('Y'), (int) $date->format('n'), 1);
+        return [
+            'release_date' => $date->format('Y-m-d'),
+            'release_year' => (int) $date->format('Y'),
+            'release_precision' => $precision,
+            'release_state' => $date > new DateTimeImmutable('today') ? 'upcoming' : 'released',
+        ];
     }
 
     private function catalog_age_status(string $release_date, string $release_state): string
@@ -191,7 +223,7 @@ class PC_Import_Command
     {
         $html = '';
         $image = esc_url($item['image_url'] ?? '');
-        if ($image) {
+        if ($image && ($item['post_type'] ?? '') !== 'ssd') {
             $html .= '<figure class="tech-product-image"><img src="' . $image . '" alt="' .
                 esc_attr($item['name'] ?? '') . '" loading="eager" decoding="async" referrerpolicy="no-referrer"></figure>';
         }
@@ -233,6 +265,29 @@ class PC_Import_Command
             $html .= '</section>';
         }
         return $html;
+    }
+
+    private function tech_excerpt(array $item): string
+    {
+        if (($item['post_type'] ?? '') !== 'ssd') {
+            return sanitize_textarea_field($item['description'] ?? '');
+        }
+
+        $values = [];
+        foreach ((array) ($item['specs'] ?? []) as $spec) {
+            $field = trim((string) ($spec['field'] ?? ''));
+            if ($field !== '' && !isset($values[$field])) {
+                $values[$field] = trim((string) ($spec['value'] ?? ''));
+            }
+        }
+        $parts = [];
+        foreach (['Capacity' => '용량', 'Interface' => '인터페이스', 'Sequential Read' => '순차 읽기', 'Sequential Write' => '순차 쓰기', 'Endurance' => '쓰기 내구성'] as $field => $label) {
+            if (!empty($values[$field]) && strcasecmp($values[$field], 'Unknown') !== 0) {
+                $parts[] = $label . ' ' . $values[$field];
+            }
+        }
+        $name = sanitize_text_field($item['name'] ?? '이 제품');
+        return sanitize_textarea_field($name . '는 ' . ($parts ? implode(', ', $parts) . ' 사양을 갖춘 ' : '') . 'SSD입니다. 주요 규격과 성능, 내구성 정보를 한국어로 확인해 보세요.');
     }
 
     private function import_phone(array $item): void
@@ -355,13 +410,13 @@ class PC_SEO_Audit_Command
         $thin = (int) $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->posts} p
              LEFT JOIN {$wpdb->postmeta} specs ON specs.post_id=p.ID AND specs.meta_key='_tech_specs'
-             WHERE p.post_status='publish' AND p.post_type IN ('laptop','cpu','gpu')
+             WHERE p.post_status='publish' AND p.post_type IN ('laptop','cpu','gpu','ssd')
                AND (specs.meta_value IS NULL OR CHAR_LENGTH(specs.meta_value) < 300)"
         );
         $missing_series = (int) $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->posts} p
              LEFT JOIN {$wpdb->postmeta} s ON s.post_id=p.ID AND s.meta_key='_catalog_series_slug'
-             WHERE p.post_status='publish' AND p.post_type IN ('phone','laptop','cpu','gpu') AND s.meta_id IS NULL"
+             WHERE p.post_status='publish' AND p.post_type IN ('phone','laptop','cpu','gpu','ssd') AND s.meta_id IS NULL"
         );
         $checks[] = ['얇은 하드웨어 페이지 없음', $thin === 0, $thin . '개'];
         $checks[] = ['시리즈 미분류 검토', $missing_series === 0, $missing_series . '개'];

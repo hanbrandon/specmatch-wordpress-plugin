@@ -155,6 +155,11 @@ function pc_tech_section_labels(): array
         'GeekBench 6 ML' => 'Geekbench 6 머신러닝', 'GeekBench 6 OpenCL' => 'Geekbench 6 OpenCL',
         '3D Mark' => '3DMark', 'PassMark' => 'PassMark', 'Passmark Graphics' => 'PassMark 그래픽',
         'Cinebench' => 'Cinebench',
+        'Specifications' => '제품 사양',
+        'SSD Overview' => '기본 정보', 'SSD Physical' => '규격 및 연결',
+        'SSD Controller' => '컨트롤러', 'SSD NAND' => '낸드 플래시',
+        'SSD DRAM' => 'DRAM 캐시', 'SSD Performance' => '성능 및 내구성',
+        'SSD Features' => '지원 기능',
     ];
 }
 
@@ -273,6 +278,49 @@ function pc_tech_key_labels(): array
         'Particle Physics' => '입자 물리 연산', 'Margin of Error' => '오차 범위',
         '1080p High' => '1080p 높음', '1080p Ultra' => '1080p 울트라',
         '1440p Ultra' => '1440p 울트라', '4K Ultra' => '4K 울트라',
+
+        'Capacity' => '용량', 'Variants' => '용량 옵션', 'Hardware Versions' => '하드웨어 버전',
+        'Overprovisioning' => '오버프로비저닝', 'Production' => '생산 상태',
+        'Price at Launch' => '출시 가격', 'Part Number' => '제품 번호', 'Market' => '대상 시장',
+        'Form Factor' => '폼팩터', 'Protocol' => '프로토콜', 'Power Draw' => '소비전력',
+        'Connector' => '커넥터', 'Manufacturer' => '제조사', 'Name' => '모델명',
+        'Core Count' => '코어 구성', 'Frequency' => '동작 속도', 'Foundry' => '파운드리',
+        'Process' => '제조 공정', 'Flash Channels' => '플래시 채널', 'Chip Enables' => '칩 활성 수',
+        'Controller Features' => '컨트롤러 기능', 'Bridge Chip Controller' => '브리지 컨트롤러',
+        'Operating NAND Flash Frequency' => '낸드 동작 속도', 'Host-Memory-Buffer (HMB)' => '호스트 메모리 버퍼(HMB)',
+        'Rebranded' => '리브랜딩명', 'Other Rebranding' => '기타 리브랜딩',
+        'Technology' => '적층 기술', 'Speed' => '속도', 'Toggle' => 'Toggle 규격', 'Topology' => '셀 구조',
+        'Dies per Chip' => '칩당 다이 수', 'Planes per Die' => '다이당 플레인 수',
+        'Decks per Die' => '다이당 데크 수', 'Word Lines' => '워드라인',
+        'Read Time (tR)' => '읽기 지연시간(tR)', 'Program Time (tProg)' => '프로그램 시간(tProg)',
+        'Block Erase Time (tBERS)' => '블록 삭제 시간(tBERS)', 'Die Read Speed' => '다이 읽기 속도',
+        'Die Write Speed' => '다이 쓰기 속도', 'Endurance: (up to)' => '낸드 최대 내구성',
+        'Page Size' => '페이지 크기', 'Block Size' => '블록 크기', 'Plane Size' => '플레인 크기',
+        'ONFI' => 'ONFI 규격', 'Organization' => '구성', 'Write Cache' => '쓰기 캐시',
+        'Sequential Read' => '순차 읽기', 'Sequential Write' => '순차 쓰기',
+        'Random Read' => '랜덤 읽기', 'Random Write' => '랜덤 쓰기',
+        'Endurance' => '쓰기 내구성', 'Warranty' => '보증 기간', 'MTBF' => '평균 무고장 시간(MTBF)',
+        'Drive Writes Per Day (DWPD)' => '일일 전체 드라이브 쓰기(DWPD)',
+        'SLC Write Cache' => 'SLC 쓰기 캐시', 'Speed when Cache Exhausted' => '캐시 소진 후 속도',
+        'Cache Folding Speed' => '캐시 폴딩 속도', 'TRIM' => 'TRIM 지원', 'SMART' => 'S.M.A.R.T. 지원',
+        'Power Loss Protection' => '전원 손실 보호', 'Encryption' => '암호화',
+        'RGB Lighting' => 'RGB 조명', 'PS5 Compatible' => 'PS5 호환',
+        'Conversion to' => '변환 대상', 'RAID Config' => 'RAID 구성', 'RAID Levels' => 'RAID 레벨',
+        'Type and Size' => '종류 및 용량', 'Hand Held MSRP' => '휴대용 기기 권장가',
+        'MSI Claw 8 EX AI+ MSRP' => 'MSI Claw 8 EX AI+ 권장가',
+        'Part Number FIPS 140' => 'FIPS 140 제품 번호', 'Part Number SED Drive' => 'SED 제품 번호',
+        'NAND 2 Manufacturer' => '보조 낸드 제조사', 'NAND 2 Name' => '보조 낸드 모델명',
+        'NAND 2 Type' => '보조 낸드 종류', 'NAND 2 Technology' => '보조 낸드 적층 기술',
+        'NAND 2 Speed' => '보조 낸드 속도', 'NAND 2 Capacity' => '보조 낸드 용량',
+        'NAND 2 Toggle' => '보조 낸드 Toggle 규격', 'NAND 2 ONFI' => '보조 낸드 ONFI 규격',
+        'NAND 2 Topology' => '보조 낸드 셀 구조', 'NAND 2 Part Number' => '보조 낸드 제품 번호',
+        'NAND 2 Die Size' => '보조 낸드 다이 면적', 'NAND 2 Dies per Chip' => '보조 낸드 칩당 다이 수',
+        'NAND 2 Planes per Die' => '보조 낸드 다이당 플레인 수', 'NAND 2 Decks per Die' => '보조 낸드 다이당 데크 수',
+        'NAND 2 Word Lines' => '보조 낸드 워드라인', 'NAND 2 Read Time tR' => '보조 낸드 읽기 지연시간(tR)',
+        'NAND 2 Program Time tProg' => '보조 낸드 프로그램 시간(tProg)',
+        'NAND 2 Block Erase Time tBERS' => '보조 낸드 블록 삭제 시간(tBERS)',
+        'NAND 2 Die Read Speed' => '보조 낸드 다이 읽기 속도', 'NAND 2 Die Write Speed' => '보조 낸드 다이 쓰기 속도',
+        'NAND 2 Page Size' => '보조 낸드 페이지 크기',
     ];
 }
 
@@ -286,4 +334,18 @@ function pc_translate_tech_key(?string $key): string
 {
     $key = trim((string) $key);
     return pc_tech_key_labels()[$key] ?? $key;
+}
+
+function pc_translate_tech_value(?string $value): string
+{
+    $value = trim((string) $value);
+    $value = preg_replace('/\s+Find More Drives$/', '', $value) ?? $value;
+    $labels = [
+        'Yes' => '지원', 'No' => '미지원', 'Unknown' => '정보 없음', 'None' => '없음',
+        'Active' => '생산 중', 'End-of-life' => '단종', 'Unreleased' => '미출시',
+        'Consumer' => '일반 소비자용', 'Enterprise' => '기업용', 'OEM' => 'OEM용',
+        'Single-Core' => '싱글 코어', 'Dual-Core' => '듀얼 코어', 'Triple-Core' => '트리플 코어',
+        'Quad-Core' => '쿼드 코어',
+    ];
+    return $labels[$value] ?? $value;
 }

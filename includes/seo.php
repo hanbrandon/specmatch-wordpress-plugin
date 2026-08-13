@@ -17,7 +17,10 @@ function pc_catalog_filter_active(): bool
 function pc_catalog_canonical_url(): string
 {
     $paged = max(1, (int) get_query_var('paged'));
-    if (is_tax('phone_brand')) {
+    $ssd_landing = sanitize_key((string) get_query_var('ssd_landing'));
+    if ($ssd_landing && get_query_var('post_type') === 'ssd') {
+        $base = home_url('/ssds/' . $ssd_landing . '/');
+    } elseif (is_tax('phone_brand')) {
         $base = get_term_link(get_queried_object());
     } else {
         $type = (string) get_query_var('post_type');
@@ -35,13 +38,17 @@ function pc_catalog_canonical_url(): string
 function pc_tech_seo_data(int $post_id): array
 {
     $type = (string) get_post_type($post_id);
-    $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU'];
+    $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU', 'ssd' => 'SSD'];
     $brands = wp_get_post_terms($post_id, 'hardware_brand', ['fields' => 'names']);
     $brand = !is_wp_error($brands) ? ($brands[0] ?? '') : '';
     $name = get_the_title($post_id);
     $score = get_post_meta($post_id, '_tech_score', true);
     $release = (string) get_post_meta($post_id, '_catalog_release_date', true);
-    $description = trim($brand . ' ' . $name . ' ' . ($labels[$type] ?? '하드웨어') . '의 전체 사양');
+    $description = $type === 'ssd' ? trim((string) get_post_field('post_excerpt', $post_id)) : '';
+    if ($description !== '') {
+        return compact('type', 'brand', 'name', 'score', 'release', 'description');
+    }
+    $description = trim(($brand && stripos($name, $brand) !== 0 ? $brand . ' ' : '') . $name . ' ' . ($labels[$type] ?? '하드웨어') . '의 전체 사양');
     if ($score !== '') {
         $description .= ', 평가 점수 ' . $score . '점';
     }
@@ -55,7 +62,9 @@ function pc_tech_seo_data(int $post_id): array
 function pc_contextual_seo_data(): array
 {
     $site_name = get_bloginfo('name') ?: '스펙매치';
-    $title = wp_get_document_title();
+    // Do not call wp_get_document_title() here: Yoast's title filter invokes
+    // this function and would recurse back through the same filter.
+    $title = $site_name;
     $description = '';
     $canonical = '';
     $image = '';
@@ -89,7 +98,7 @@ function pc_contextual_seo_data(): array
             $image = (string) pc_public_image_url($device);
             $type = 'product';
         }
-    } elseif (is_singular(['laptop', 'cpu', 'gpu'])) {
+    } elseif (is_singular(['laptop', 'cpu', 'gpu', 'ssd'])) {
         $post_id = (int) get_queried_object_id();
         $data = pc_tech_seo_data($post_id);
         $title = $data['name'] . ' 스펙·벤치마크 | ' . $site_name;
@@ -97,15 +106,31 @@ function pc_contextual_seo_data(): array
         $canonical = get_permalink($post_id);
         $image = (string) pc_public_tech_image_url($post_id);
         $type = 'product';
-    } elseif (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu']) || is_tax('phone_brand')) {
+    } elseif (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu', 'ssd']) || is_tax('phone_brand')) {
         $archive_type = is_tax('phone_brand') ? 'phone' : (string) get_query_var('post_type');
-        $labels = ['phone' => '스마트폰', 'laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU'];
+        $labels = ['phone' => '스마트폰', 'laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU', 'ssd' => 'SSD'];
         $brand = is_tax('phone_brand')
             ? single_term_title('', false)
             : ucwords(str_replace('-', ' ', sanitize_text_field((string) get_query_var('tech_brand'))));
         $label = trim(($brand ? $brand . ' ' : '') . ($labels[$archive_type] ?? '제품'));
-        $title = $label . ' 최신 제품·스펙 | ' . $site_name;
-        $description = $label . '의 최신 제품, 출시일, 주요 사양과 평가 데이터를 최신순으로 확인하고 비교하세요.';
+        if ($archive_type === 'ssd') {
+            $ssd_landing = sanitize_key((string) get_query_var('ssd_landing'));
+            $ssd_landing_labels = function_exists('ps_ssd_landing_labels') ? ps_ssd_landing_labels() : [];
+            if ($ssd_landing && isset($ssd_landing_labels[$ssd_landing])) {
+                $title = $ssd_landing_labels[$ssd_landing] . ' 제품·사양 비교 | ' . $site_name;
+                $description = $ssd_landing_labels[$ssd_landing] . ' 제품의 용량, 컨트롤러, NAND, 읽기·쓰기 속도와 내구성을 최신순으로 확인하고 비교하세요.';
+            } else {
+                $title = $brand
+                ? $brand . ' SSD 전체 제품 및 사양 비교 | ' . $site_name
+                : 'SSD 사양 비교 데이터베이스 – NVMe·SATA·용량별 검색 | ' . $site_name;
+                $description = $brand
+                ? $brand . ' SSD의 용량, 인터페이스, 컨트롤러, NAND, 읽기·쓰기 속도와 내구성을 제품별로 확인하고 비교하세요.'
+                : 'SSD 제품의 NVMe·SATA 인터페이스, 용량, 컨트롤러, NAND, 읽기·쓰기 속도와 내구성을 한국어로 검색하고 비교하세요.';
+            }
+        } else {
+            $title = $label . ' 최신 제품·스펙 | ' . $site_name;
+            $description = $label . '의 최신 제품, 출시일, 주요 사양과 평가 데이터를 최신순으로 확인하고 비교하세요.';
+        }
         $canonical = pc_catalog_canonical_url();
     } elseif (pc_is_compare()) {
         if (pc_compare_type() !== 'phone') {
@@ -201,8 +226,11 @@ function pc_output_item_list_schema(): void
 
 function pc_output_seo(): void
 {
-    pc_output_breadcrumb_schema();
-    pc_output_primary_meta(pc_contextual_seo_data());
+    $yoast_active = defined('WPSEO_VERSION');
+    if (!$yoast_active) {
+        pc_output_breadcrumb_schema();
+        pc_output_primary_meta(pc_contextual_seo_data());
+    }
 
     if (function_exists('pc_is_series') && pc_is_series()) {
         $posts = pc_series_posts();
@@ -270,15 +298,15 @@ function pc_output_seo(): void
         return;
     }
 
-    if (is_singular(['laptop', 'cpu', 'gpu'])) {
+    if (is_singular(['laptop', 'cpu', 'gpu', 'ssd'])) {
         $post_id = (int) get_queried_object_id();
         echo '<meta property="article:modified_time" content="' . esc_attr(get_post_modified_time(DATE_W3C, true, $post_id)) . '">' . "\n";
         return;
     }
 
-    if (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu']) || is_tax('phone_brand')) {
+    if (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu', 'ssd']) || is_tax('phone_brand')) {
         $type = is_tax('phone_brand') ? 'phone' : (string) get_query_var('post_type');
-        $labels = ['phone' => '스마트폰', 'laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU'];
+        $labels = ['phone' => '스마트폰', 'laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU', 'ssd' => 'SSD'];
         $brand = is_tax('phone_brand')
             ? single_term_title('', false)
             : ucwords(str_replace('-', ' ', sanitize_text_field((string) get_query_var('tech_brand'))));
@@ -308,6 +336,44 @@ function pc_output_seo(): void
     }
 }
 
+function pc_yoast_title(string $title): string
+{
+    $meta = pc_contextual_seo_data();
+    return $meta['title'] ?: $title;
+}
+
+function pc_yoast_description(string $description): string
+{
+    $meta = pc_contextual_seo_data();
+    return $meta['description'] ?: $description;
+}
+
+function pc_yoast_canonical(string $canonical): string
+{
+    $meta = pc_contextual_seo_data();
+    return $meta['canonical'] ?: $canonical;
+}
+
+function pc_yoast_schema_graph(array $graph): array
+{
+    $normalize = static function (&$value) use (&$normalize): void {
+        if (!is_array($value)) return;
+        foreach ($value as $key => &$entry) {
+            if ($key === 'inLanguage') $entry = 'ko-KR';
+            elseif ($key === 'name' && $entry === 'Home') $entry = '홈';
+            elseif (is_array($entry)) $normalize($entry);
+        }
+    };
+    $normalize($graph);
+    return $graph;
+}
+
+function pc_yoast_breadcrumb_links(array $links): array
+{
+    if (isset($links[0]['text'])) $links[0]['text'] = '홈';
+    return $links;
+}
+
 function pc_breadcrumb_items(): array
 {
     $items = [['name' => '홈', 'url' => home_url('/')]];
@@ -315,14 +381,14 @@ function pc_breadcrumb_items(): array
     if (function_exists('pc_is_series') && pc_is_series()) {
         $type = sanitize_key((string) get_query_var('pc_series_type'));
         $posts = pc_series_posts();
-        $labels = ['phone' => '스마트폰', 'laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU'];
+        $labels = ['phone' => '스마트폰', 'laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU', 'ssd' => 'SSD'];
         $items[] = ['name' => $labels[$type] ?? '제품', 'url' => get_post_type_archive_link($type)];
         $items[] = ['name' => $posts ? (string) get_post_meta($posts[0]->ID, '_catalog_series_label', true) : '시리즈', 'url' => ''];
     } elseif (is_post_type_archive('phone')) {
         $items[] = ['name' => '전체 휴대폰', 'url' => ''];
-    } elseif (is_post_type_archive(['laptop', 'cpu', 'gpu'])) {
+    } elseif (is_post_type_archive(['laptop', 'cpu', 'gpu', 'ssd'])) {
         $type = (string) get_query_var('post_type');
-        $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU'];
+        $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU', 'ssd' => 'SSD'];
         $brand = ucwords(str_replace('-', ' ', sanitize_text_field((string) get_query_var('tech_brand'))));
         $items[] = ['name' => $labels[$type] ?? '하드웨어', 'url' => $brand ? get_post_type_archive_link($type) : ''];
         if ($brand) {
@@ -341,9 +407,9 @@ function pc_breadcrumb_items(): array
             }
             $items[] = ['name' => pc_product_name((int) $device->post_id), 'url' => ''];
         }
-    } elseif (is_singular(['laptop', 'cpu', 'gpu'])) {
+    } elseif (is_singular(['laptop', 'cpu', 'gpu', 'ssd'])) {
         $type = get_post_type();
-        $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU'];
+        $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU', 'ssd' => 'SSD'];
         $items[] = ['name' => $labels[$type] ?? '하드웨어', 'url' => get_post_type_archive_link($type)];
         $items[] = ['name' => get_the_title(), 'url' => ''];
     } elseif (pc_is_compare()) {
@@ -421,7 +487,7 @@ function pc_prevent_public_image_indexing(array $robots): array
 function pc_redirect_legacy_hardware_brand_url(): void
 {
     if (
-        !is_post_type_archive(['laptop', 'cpu', 'gpu'])
+        !is_post_type_archive(['laptop', 'cpu', 'gpu', 'ssd'])
         || !isset($_GET['tech_brand'])
         || pc_catalog_filter_active()
     ) {
@@ -440,7 +506,7 @@ function pc_catalog_empty_filter_status(): void
     global $wp_query;
     if (
         pc_catalog_filter_active()
-        && (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu']) || is_tax('phone_brand'))
+        && (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu', 'ssd']) || is_tax('phone_brand'))
         && $wp_query instanceof WP_Query
         && !$wp_query->have_posts()
     ) {
@@ -467,17 +533,23 @@ function pc_document_title_parts(array $parts): array
         if ($device) {
             $parts['title'] = pc_product_name((int) $device->post_id) . ' 스펙·평가·비교';
         }
-    } elseif (is_singular(['laptop', 'cpu', 'gpu'])) {
+    } elseif (is_singular(['laptop', 'cpu', 'gpu', 'ssd'])) {
         $data = pc_tech_seo_data((int) get_queried_object_id());
         $parts['title'] = $data['name'] . ' 스펙·벤치마크';
-    } elseif (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu']) || is_tax('phone_brand')) {
+    } elseif (is_post_type_archive(['phone', 'laptop', 'cpu', 'gpu', 'ssd']) || is_tax('phone_brand')) {
         $type = is_tax('phone_brand') ? 'phone' : (string) get_query_var('post_type');
-        $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU'];
+        $labels = ['laptop' => '노트북', 'cpu' => 'CPU', 'gpu' => 'GPU', 'ssd' => 'SSD'];
         $labels['phone'] = '스마트폰';
         $brand = is_tax('phone_brand')
             ? single_term_title('', false)
             : ucwords(str_replace('-', ' ', sanitize_text_field((string) get_query_var('tech_brand'))));
-        $parts['title'] = trim(($brand ? $brand . ' ' : '') . ($labels[$type] ?? '제품')) . ' 최신 제품·스펙';
+        $ssd_landing = $type === 'ssd' ? sanitize_key((string) get_query_var('ssd_landing')) : '';
+        $ssd_landing_labels = function_exists('ps_ssd_landing_labels') ? ps_ssd_landing_labels() : [];
+        $parts['title'] = $type === 'ssd'
+            ? ($ssd_landing && isset($ssd_landing_labels[$ssd_landing])
+                ? $ssd_landing_labels[$ssd_landing] . ' 제품·사양 비교'
+                : ($brand ? $brand . ' SSD 전체 제품 및 사양 비교' : 'SSD 사양 비교 데이터베이스 – NVMe·SATA·용량별 검색'))
+            : trim(($brand ? $brand . ' ' : '') . ($labels[$type] ?? '제품')) . ' 최신 제품·스펙';
     } elseif (pc_is_compare()) {
         if (pc_compare_type() !== 'phone') {
             [$a, $b] = pc_compare_tech_posts();

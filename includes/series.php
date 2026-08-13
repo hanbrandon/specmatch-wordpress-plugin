@@ -60,7 +60,7 @@ function pc_detect_product_series(string $post_type, string $name, string $slug 
 function pc_assign_product_series(int $post_id): void
 {
     $post = get_post($post_id);
-    if (!$post || !in_array($post->post_type, ['phone', 'laptop', 'cpu', 'gpu'], true)) {
+    if (!$post || !in_array($post->post_type, ['phone', 'laptop', 'cpu', 'gpu', 'ssd'], true)) {
         return;
     }
     $series = pc_detect_product_series($post->post_type, $post->post_title, $post->post_name);

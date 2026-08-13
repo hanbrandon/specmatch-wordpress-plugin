@@ -221,9 +221,9 @@ function pc_search_post_ids(string $keyword, string $post_type = 'phone', int $l
         return [];
     }
 
-    $types = in_array($post_type, ['phone', 'laptop', 'cpu', 'gpu'], true)
+    $types = in_array($post_type, ['phone', 'laptop', 'cpu', 'gpu', 'ssd'], true)
         ? [$post_type]
-        : ['phone', 'laptop', 'cpu', 'gpu'];
+        : ['phone', 'laptop', 'cpu', 'gpu', 'ssd'];
     $limit = max(1, min(5000, $limit));
     $cache_key = 'pc_search_' . md5($keyword . '|' . implode(',', $types) . '|' . $limit);
     $cached = get_transient($cache_key);

@@ -64,6 +64,9 @@ function pc_public_image_url(?object $device): ?string
 
 function pc_public_tech_image_url(int $post_id): ?string
 {
+    if (get_post_type($post_id) === 'ssd') {
+        return null;
+    }
     if (!get_post_meta($post_id, '_tech_image_url', true)) {
         return null;
     }

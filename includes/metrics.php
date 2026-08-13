@@ -23,7 +23,7 @@ function pc_register_metrics_routes(): void
             if (
                 !$post
                 || $post->post_status !== 'publish'
-                || !in_array($post->post_type, ['phone', 'laptop', 'cpu', 'gpu'], true)
+                || !in_array($post->post_type, ['phone', 'laptop', 'cpu', 'gpu', 'ssd'], true)
                 || !in_array($event, ['view', 'compare', 'affiliate', 'search_click'], true)
                 || strlen($session) < 12
             ) {
@@ -51,7 +51,7 @@ function pc_register_metrics_routes(): void
 function pc_popular_posts_from_events(string $post_type, int $limit = 5, int $exclude_post_id = 0): array
 {
     global $wpdb;
-    if (!in_array($post_type, ['phone', 'laptop', 'cpu', 'gpu'], true)) {
+    if (!in_array($post_type, ['phone', 'laptop', 'cpu', 'gpu', 'ssd'], true)) {
         return [];
     }
     $cache_key = 'pc_popular_' . $post_type . '_' . $limit . '_' . $exclude_post_id;

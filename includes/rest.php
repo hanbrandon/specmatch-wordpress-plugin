@@ -22,7 +22,7 @@ function pc_register_rest_routes(): void
         ],
         'callback' => function (WP_REST_Request $request): WP_REST_Response {
             $post_type = (string) $request->get_param('type');
-            if (!in_array($post_type, ['all', 'phone', 'laptop', 'cpu', 'gpu'], true)) {
+            if (!in_array($post_type, ['all', 'phone', 'laptop', 'cpu', 'gpu', 'ssd'], true)) {
                 $post_type = 'all';
             }
             $matched_ids = pc_search_post_ids((string) $request->get_param('q'), $post_type, 50);
@@ -30,7 +30,7 @@ function pc_register_rest_routes(): void
                 return new WP_REST_Response([]);
             }
             $query = new WP_Query([
-                'post_type' => $post_type === 'all' ? ['phone', 'laptop', 'cpu', 'gpu'] : $post_type,
+                'post_type' => $post_type === 'all' ? ['phone', 'laptop', 'cpu', 'gpu', 'ssd'] : $post_type,
                 'post_status' => 'publish',
                 'post__in' => $matched_ids,
                 'posts_per_page' => 10,

@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
 function pc_register_compare_routes(): void
 {
     add_rewrite_rule(
-        '^compare/(laptop|cpu|gpu)/([^/]+)-vs-([^/]+)/?$',
+        '^compare/(laptop|cpu|gpu|ssd)/([^/]+)-vs-([^/]+)/?$',
         'index.php?pc_compare=1&pc_compare_type=$matches[1]&pc_phone_a=$matches[2]&pc_phone_b=$matches[3]',
         'top'
     );
@@ -30,7 +30,7 @@ function pc_compare_query_vars(array $vars): array
 function pc_compare_type(): string
 {
     $type = sanitize_key((string) get_query_var('pc_compare_type'));
-    return in_array($type, ['laptop', 'cpu', 'gpu'], true) ? $type : 'phone';
+    return in_array($type, ['laptop', 'cpu', 'gpu', 'ssd'], true) ? $type : 'phone';
 }
 
 function pc_is_compare(): bool
@@ -84,7 +84,7 @@ function pc_compare_tech_url(WP_Post $a, WP_Post $b): string
 
 function pc_compare_tech_is_indexable(WP_Post $a, WP_Post $b): bool
 {
-    if ($a->post_type !== $b->post_type || !in_array($a->post_type, ['laptop', 'cpu', 'gpu'], true)) {
+    if ($a->post_type !== $b->post_type || !in_array($a->post_type, ['laptop', 'cpu', 'gpu', 'ssd'], true)) {
         return false;
     }
     $a_specs = json_decode((string) get_post_meta($a->ID, '_tech_specs', true), true) ?: [];
@@ -96,6 +96,11 @@ function pc_compare_tech_is_indexable(WP_Post $a, WP_Post $b): bool
     $date_b = (string) get_post_meta($b->ID, '_catalog_release_date', true);
     if (!$date_a || !$date_b || abs((int) substr($date_a, 0, 4) - (int) substr($date_b, 0, 4)) > 4) {
         return false;
+    }
+    if ($a->post_type === 'ssd') {
+        return function_exists('ps_ssd_scorecard')
+            && ps_ssd_scorecard($a->ID)['overall'] !== null
+            && ps_ssd_scorecard($b->ID)['overall'] !== null;
     }
     return get_post_meta($a->ID, '_tech_score', true) !== ''
         && get_post_meta($b->ID, '_tech_score', true) !== '';

@@ -51,16 +51,22 @@ function pc_selected_comparisons(int $limit = 100): array
 function pc_selected_tech_comparisons(int $limit_per_type = 25): array
 {
     $comparisons = [];
-    foreach (['laptop', 'cpu', 'gpu'] as $type) {
-        $posts = get_posts([
+    foreach (['laptop', 'cpu', 'gpu', 'ssd'] as $type) {
+        $query_args = [
             'post_type' => $type,
             'post_status' => 'publish',
             'posts_per_page' => 18,
-            'meta_key' => '_tech_score',
-            'orderby' => ['meta_value_num' => 'DESC', 'date' => 'DESC'],
             'order' => 'DESC',
             'no_found_rows' => true,
-        ]);
+        ];
+        if ($type === 'ssd') {
+            $query_args['meta_key'] = '_catalog_release_date';
+            $query_args['orderby'] = ['meta_value' => 'DESC', 'date' => 'DESC'];
+        } else {
+            $query_args['meta_key'] = '_tech_score';
+            $query_args['orderby'] = ['meta_value_num' => 'DESC', 'date' => 'DESC'];
+        }
+        $posts = get_posts($query_args);
         $type_count = 0;
         for ($i = 0, $total = count($posts); $i < $total; $i++) {
             for ($j = $i + 1; $j < min($total, $i + 3); $j++) {
@@ -85,7 +91,7 @@ function pc_hardware_brand_sitemap_urls(): array
 {
     global $wpdb;
     $urls = [];
-    foreach (['laptop', 'cpu', 'gpu'] as $type) {
+    foreach (['laptop', 'cpu', 'gpu', 'ssd'] as $type) {
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT t.slug, MAX(p.post_modified_gmt) AS lastmod
              FROM {$wpdb->posts} p
@@ -113,7 +119,7 @@ function pc_series_sitemap_urls(): array
         "SELECT p.post_type, slug.meta_value AS series_slug, MAX(p.post_modified_gmt) AS lastmod
          FROM {$wpdb->posts} p
          INNER JOIN {$wpdb->postmeta} slug ON slug.post_id=p.ID AND slug.meta_key='_catalog_series_slug'
-         WHERE p.post_status='publish' AND p.post_type IN ('phone','laptop','cpu','gpu') AND slug.meta_value <> ''
+         WHERE p.post_status='publish' AND p.post_type IN ('phone','laptop','cpu','gpu','ssd') AND slug.meta_value <> ''
          GROUP BY p.post_type, slug.meta_value"
     );
     return array_map(static fn($row): array => [
