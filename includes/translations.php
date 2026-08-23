@@ -23,6 +23,8 @@ function pc_spec_section_labels(): array
         'Battery' => '배터리',
         'Misc' => '기타',
         'Tests' => '테스트',
+        'Our Tests' => '실측 테스트',
+        'EU LABEL' => 'EU 제품 등급',
     ];
 }
 
@@ -87,6 +89,10 @@ function pc_spec_field_labels(): array
         'Battery life' => '배터리 사용 시간',
         'Endurance rating' => '배터리 지속 점수',
         'Active use score' => '실사용 점수',
+        'Energy' => '에너지 효율',
+        'Battery' => '배터리 내구성',
+        'Free fall' => '낙하 내구성',
+        'Repairability' => '수리 용이성',
         'Contrast ratio' => '명암비',
         'Note' => '메모',
         '메모' => '메모',
