@@ -138,23 +138,46 @@ PROMPT;
         'generated_at' => current_time('mysql', true),
         'model' => (string) ($body['model'] ?? PC_OPENROUTER_MODEL),
     ];
-    global $wpdb;
-    $wpdb->replace(pc_table('ai_content'), [
-        'device_id' => (int) $device->id,
-        'content_type' => 'editorial_v1',
-        'content' => wp_json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        'model' => PC_OPENROUTER_MODEL,
-        'prompt_version' => PC_AI_PROMPT_VERSION,
-        'status' => 'published',
-        'facts_hash' => hash('sha256', wp_json_encode($facts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
-        'created_at' => current_time('mysql', true),
-        'reviewed_at' => current_time('mysql', true),
-    ]);
-    if ($wpdb->last_error) {
-        return new WP_Error('pc_ai_save_failed', 'AI 콘텐츠 저장에 실패했습니다: ' . $wpdb->last_error);
+    $saved = pc_save_device_editorial((int) $device->id, $clean, $facts, (string) ($body['model'] ?? PC_OPENROUTER_MODEL));
+    if (is_wp_error($saved)) {
+        return $saved;
     }
     clean_post_cache($post_id);
     return $clean;
+}
+
+function pc_save_device_editorial(int $device_id, array $content, array $facts = [], string $model = PC_OPENROUTER_MODEL): true|WP_Error
+{
+    $clean = [
+        'intro' => sanitize_textarea_field((string) ($content['intro'] ?? '')),
+        'verdict' => sanitize_textarea_field((string) ($content['verdict'] ?? '')),
+        'highlights' => pc_ai_clean_objects($content['highlights'] ?? [], ['label', 'text'], 4),
+        'strengths' => pc_ai_clean_strings($content['strengths'] ?? [], 5),
+        'cautions' => pc_ai_clean_strings($content['cautions'] ?? [], 5),
+        'recommended_for' => pc_ai_clean_strings($content['recommended_for'] ?? [], 4),
+        'faq' => pc_ai_clean_objects($content['faq'] ?? [], ['question', 'answer'], 5),
+        'generated_at' => sanitize_text_field((string) ($content['generated_at'] ?? current_time('mysql', true))),
+        'model' => sanitize_text_field($model),
+    ];
+    if ($clean['intro'] === '' || $clean['verdict'] === '') {
+        return new WP_Error('pc_ai_invalid_content', '소개문과 핵심 판단은 필수입니다.');
+    }
+    global $wpdb;
+    $result = $wpdb->replace(pc_table('ai_content'), [
+        'device_id' => $device_id,
+        'content_type' => 'editorial_v1',
+        'content' => wp_json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        'model' => $model,
+        'prompt_version' => PC_AI_PROMPT_VERSION,
+        'status' => 'published',
+        'facts_hash' => $facts ? hash('sha256', wp_json_encode($facts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) : '',
+        'created_at' => current_time('mysql', true),
+        'reviewed_at' => current_time('mysql', true),
+    ]);
+    if ($result === false) {
+        return new WP_Error('pc_ai_save_failed', 'AI 콘텐츠 저장에 실패했습니다: ' . $wpdb->last_error);
+    }
+    return true;
 }
 
 function pc_ai_clean_strings(mixed $items, int $limit): array
@@ -253,4 +276,3 @@ function pc_ai_admin_page(): void
     </div>
     <?php
 }
-
