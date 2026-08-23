@@ -46,6 +46,24 @@ function pc_register_rest_routes(): void
         },
     ]);
 
+    register_rest_route('phone-catalog/v1', '/ai/device/(?P<id>\d+)/specs', [
+        'methods' => 'POST',
+        'permission_callback' => static fn(): bool => current_user_can('manage_options'),
+        'callback' => function (WP_REST_Request $request): WP_REST_Response|WP_Error {
+            $payload = $request->get_json_params();
+            if (!is_array($payload) || !is_array($payload['items'] ?? null)) {
+                return new WP_Error('pc_ai_invalid_payload', '스펙 번역 JSON이 필요합니다.', ['status' => 400]);
+            }
+            $result = pc_save_device_spec_localizations(
+                absint($request->get_param('id')),
+                $payload['items'],
+                sanitize_text_field((string) ($payload['model'] ?? PC_OPENROUTER_MODEL))
+            );
+            if (is_wp_error($result)) return $result;
+            return new WP_REST_Response($result);
+        },
+    ]);
+
     register_rest_route('phone-catalog/v1', '/search', [
         'methods' => 'GET',
         'permission_callback' => '__return_true',

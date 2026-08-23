@@ -36,6 +36,7 @@ function pc_device_ai_facts(object $device): array
             continue;
         }
         $specs[] = [
+            'id' => (int) $row->id,
             'section' => $section,
             'field' => $field ?: '추가 정보',
             'value' => mb_substr($value, 0, 600),
@@ -57,6 +58,65 @@ function pc_device_ai_facts(object $device): array
         'os' => pc_public_text((string) $device->os),
         'specifications' => array_slice($specs, 0, 120),
     ];
+}
+
+function pc_device_spec_localizations(int $device_id): array
+{
+    $content = pc_get_ai_content($device_id, 'spec_localization_v1');
+    $decoded = $content ? json_decode($content, true) : null;
+    if (!is_array($decoded)) return [];
+    $map = [];
+    foreach ($decoded['items'] ?? [] as $item) {
+        $id = absint($item['id'] ?? 0);
+        $value = sanitize_textarea_field((string) ($item['localized_value'] ?? ''));
+        if ($id && $value !== '') $map[$id] = $value;
+    }
+    return $map;
+}
+
+function pc_spec_numeric_tokens(string $value): array
+{
+    preg_match_all('/\d+(?:\.\d+)?/u', $value, $matches);
+    return $matches[0] ?? [];
+}
+
+function pc_save_device_spec_localizations(int $device_id, array $items, string $model = PC_OPENROUTER_MODEL): array|WP_Error
+{
+    global $wpdb;
+    $rows = $wpdb->get_results($wpdb->prepare(
+        'SELECT id, field_value FROM ' . pc_table('specs') . ' WHERE device_id = %d',
+        $device_id
+    ));
+    $originals = [];
+    foreach ($rows as $row) $originals[(int) $row->id] = (string) $row->field_value;
+    $clean = [];
+    $rejected = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) continue;
+        $id = absint($item['id'] ?? 0);
+        $value = sanitize_textarea_field((string) ($item['localized_value'] ?? ''));
+        if (!$id || $value === '' || !isset($originals[$id])) continue;
+        if (pc_spec_numeric_tokens($originals[$id]) !== pc_spec_numeric_tokens($value)) {
+            $rejected[] = $id;
+            continue;
+        }
+        $clean[] = ['id' => $id, 'localized_value' => $value];
+    }
+    if (!$clean) return new WP_Error('pc_ai_specs_empty', '숫자 검증을 통과한 번역 결과가 없습니다.');
+    $payload = ['items' => $clean, 'rejected' => $rejected, 'generated_at' => current_time('mysql', true), 'model' => $model];
+    $result = $wpdb->replace(pc_table('ai_content'), [
+        'device_id' => $device_id,
+        'content_type' => 'spec_localization_v1',
+        'content' => wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        'model' => $model,
+        'prompt_version' => 'spec-localization-v1',
+        'status' => 'published',
+        'facts_hash' => hash('sha256', wp_json_encode($originals, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
+        'created_at' => current_time('mysql', true),
+        'reviewed_at' => current_time('mysql', true),
+    ]);
+    if ($result === false) return new WP_Error('pc_ai_specs_save_failed', '스펙 번역 저장에 실패했습니다: ' . $wpdb->last_error);
+    return ['saved' => count($clean), 'rejected' => $rejected];
 }
 
 function pc_generate_device_editorial(int $post_id): array|WP_Error
