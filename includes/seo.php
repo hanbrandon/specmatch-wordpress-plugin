@@ -101,8 +101,11 @@ function pc_contextual_seo_data(): array
         $device = pc_get_device((int) get_queried_object_id());
         if ($device) {
             $name = pc_product_name((int) $device->post_id);
+            $editorial = function_exists('pc_device_editorial') ? pc_device_editorial((int) $device->id) : null;
             $title = $name . ' 스펙·평가·비교 | ' . $site_name;
-            $description = $name . '의 출시일, 화면, 카메라, 배터리, 성능과 전체 스펙을 확인하고 비슷한 최신 제품과 비교하세요.';
+            $description = !empty($editorial['intro'])
+                ? wp_html_excerpt((string) $editorial['intro'], 155, '…')
+                : $name . '의 출시일, 화면, 카메라, 배터리, 성능과 전체 스펙을 확인하고 비슷한 최신 제품과 비교하세요.';
             $canonical = get_permalink((int) $device->post_id);
             $image = (string) pc_public_image_url($device);
             $type = 'product';
@@ -290,7 +293,8 @@ function pc_output_seo(): void
             'url' => get_permalink(),
         ];
         $insights = pc_device_insights($device);
-        $description = $insights['summary'];
+        $editorial = function_exists('pc_device_editorial') ? pc_device_editorial((int) $device->id) : null;
+        $description = !empty($editorial['intro']) ? $editorial['intro'] : $insights['summary'];
         $schema['description'] = $description;
         $schema['offers'] = array_map(static function ($offer): array {
             return [
